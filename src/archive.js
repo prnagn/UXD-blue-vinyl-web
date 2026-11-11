@@ -56,6 +56,17 @@ async function readStore(store) {
 }
 
 export const loadAlbums = () => readStore('albums');
+export async function resetArchive(onBlocked = () => {}) {
+  const previous = database;
+  database = undefined;
+  if (previous) { try { (await previous).close(); } catch { /* A failed connection does not prevent deletion. */ } }
+  await new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase('blue-vinyl-archive');
+    request.onsuccess = resolve;
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => onBlocked();
+  });
+}
 export async function loadInbox() {
   const items = await readStore('inbox');
   return items.filter((item) => item.album).sort((a, b) => b.receivedAt - a.receivedAt);
@@ -120,9 +131,12 @@ export function trackArt(album, track) {
 
 export function replayTracks(entries) {
   const audio = entries.filter((entry) => ['audio', 'video'].includes(entry.kind));
+  const sequenced = entries.some((entry) => Number.isFinite(entry.sequence));
   return entries.filter((entry) => audio.includes(entry) || (entry.kind === 'photo' && entry.spotify &&
     !audio.some((sound) => entry.captureId ? sound.captureId === entry.captureId : sound.day === entry.day && sound.time === entry.time)))
-    .sort((a, b) => ((a.day || '') + (a.time || '')).localeCompare((b.day || '') + (b.time || '')));
+    .sort((a, b) => sequenced
+      ? (a.sequence ?? entries.indexOf(a)) - (b.sequence ?? entries.indexOf(b))
+      : ((a.day || '') + (a.time || '')).localeCompare((b.day || '') + (b.time || '')));
 }
 
 // Keep the saved moment intact; its Spotify song is a separate player track.
@@ -192,6 +206,8 @@ export async function importAlbum(file) {
       time: typeof entry.time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(entry.time) ? entry.time : '',
       note: clean(entry.note, 3000), artist: clean(entry.artist, 120), fieldRecording: entry.fieldRecording === true,
       captureId: typeof entry.captureId === 'string' ? clean(entry.captureId, 80) : undefined,
+      place: clean(entry.place, 180),
+      sequence: Number.isFinite(entry.sequence) && entry.sequence >= 0 ? Math.min(100000, Math.floor(entry.sequence)) : undefined,
       durationMs: Number.isFinite(entry.durationMs) ? Math.max(0, Math.min(300000, entry.durationMs)) : undefined,
       waveform: Array.isArray(entry.waveform) ? entry.waveform.slice(0, 360).map((value) => Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0) : undefined,
       spotify: spotifyTrack(entry.spotify),

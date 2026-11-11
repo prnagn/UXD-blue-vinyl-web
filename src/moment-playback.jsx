@@ -97,15 +97,28 @@ export function MomentPlayback({ entry, onPlaying }) {
   ] : [{ id: 'full', label: entry.name }]) : song ? [{ id: 'spotify', label: song.name }] : [];
   const [selected, setSelected] = useState('');
   const [spotifyOpen, setSpotifyOpen] = useState(false);
+  const spotifyController = useRef(null);
+  const spotifyIntent = useRef(false);
+  const choice = useRef(0);
   const index = Math.max(0, segments.findIndex((segment) => segment.id === selected));
   const segment = segments[index];
 
-  function choose(next) {
+  async function choose(next) {
+    const call = ++choice.current;
     ambient.stop();
-    setSpotifyOpen(false); // Removing the widget stops Spotify before ambient playback.
-    setSelected(next.id);
-    if (next.id === 'spotify') setSpotifyOpen(true);
-    else ambient.play(next.id);
+    if (next.id === 'spotify') {
+      setSelected(next.id);
+      spotifyIntent.current = true;
+      setSpotifyOpen(true);
+      if (spotifyController.current) { spotifyIntent.current = false; spotifyController.current.resume(); }
+    }
+    else {
+      const paused = await spotifyController.current?.pause();
+      if (paused === false || choice.current !== call) return;
+      setSpotifyOpen(false);
+      setSelected(next.id);
+      ambient.play(next.id);
+    }
   }
 
   if (!segment) return null;
@@ -118,13 +131,14 @@ export function MomentPlayback({ entry, onPlaying }) {
     <div className="moment-transport">
       <button className="icon-button" aria-label="이전 트랙" disabled={index === 0} onClick={() => choose(segments[index - 1])}><Icon name="skip-back" /></button>
       <button className="moment-segment-play" aria-label={segment.id === 'spotify' ? 'Spotify 플레이어 열기' : ambient.playing ? '현장음 정지' : segment.label + ' 재생'}
-        disabled={ambient.loading} onClick={() => ambient.playing ? ambient.stop() : choose(segment)}>
+        disabled={ambient.loading} onClick={() => segment.id === 'spotify' && spotifyController.current ? spotifyController.current.togglePlay() : ambient.playing ? ambient.stop() : choose(segment)}>
         <Icon name={ambient.playing ? 'pause' : 'play'} size={17} /><span>{ambient.loading ? '불러오는 중' : segment.id === 'spotify' ? 'Spotify' : segment.label}</span>
       </button>
       <button className="icon-button" aria-label="다음 트랙" disabled={index >= segments.length - 1} onClick={() => choose(segments[index + 1])}><Icon name="skip-next" /></button>
     </div>
     <p className="moment-segment-count" aria-live="polite">{index + 1} / {segments.length}</p>
-    {segment.id === 'spotify' && spotifyOpen && <SpotifyPlayer song={song} />}
+    {segment.id === 'spotify' && spotifyOpen && <SpotifyPlayer song={song} onPlaying={onPlaying} controllerRef={spotifyController}
+      onReady={(controller) => { if (spotifyIntent.current) { spotifyIntent.current = false; controller.resume(); } }} />}
     {ambient.error && <p className="error" role="status">{ambient.error}</p>}
   </section>;
 }

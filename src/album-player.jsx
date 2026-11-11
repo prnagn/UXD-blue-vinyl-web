@@ -4,6 +4,7 @@ import { albumPlaybackTracks, trackArt } from './archive';
 import { SpotifyPlayer } from './spotify-player';
 import { ReplayArm } from './replay-arm';
 import { trackRadius } from './replay-geometry';
+import { ScatteredPhotos } from './album-photos';
 import { albumTitle, Icon, Top, useMedia, Vinyl } from './ui';
 
 export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, selectedId, onTrack, back, send, autoStart, save, busy }) {
@@ -14,13 +15,18 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
   const [error, setError] = useState('');
   const [zoom, setZoom] = useState('record');
   const player = useRef(null);
+  const spotifyController = useRef(null);
+  const spotifyIntent = useRef('');
+  const activeTrack = useRef(track?.id);
+  activeTrack.current = track?.id;
   const wantsPlayback = useRef(Boolean(autoStart));
   const stage = useRef(null);
   const startDistance = useRef(0);
   const zoomTimer = useRef(null);
   const index = tracks.indexOf(track);
   const source = useMedia(track);
-  const art = useMedia(trackArt(album, track));
+  const currentPhoto = trackArt(album, track);
+  const art = useMedia(currentPhoto);
   const isMedia = track?.kind === 'audio' || track?.kind === 'video';
   const isSpotify = track?.kind === 'spotify';
   useEffect(() => () => clearTimeout(zoomTimer.current), []);
@@ -46,7 +52,9 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
 
   function stop() {
     wantsPlayback.current = false;
+    spotifyIntent.current = '';
     player.current?.pause();
+    spotifyController.current?.pause();
     setPlaying(false);
   }
 
@@ -54,13 +62,22 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
     if (!entry) return;
     stop();
     wantsPlayback.current = autoplay && entry.kind !== 'spotify';
+    spotifyIntent.current = autoplay && entry.kind === 'spotify' ? entry.id : '';
     setReveal(entry.kind === 'spotify');
-    if (entry.id === track?.id && autoplay) start(player.current);
+    if (entry.id === track?.id && autoplay) {
+      if (entry.kind === 'spotify') spotifyController.current?.resume();
+      else start(player.current);
+    }
     else onTrack(entry);
   }
 
   async function play() {
-    if (isSpotify) { setReveal(true); return; }
+    if (isSpotify) {
+      setReveal(true);
+      if (spotifyController.current) spotifyController.current.togglePlay();
+      else spotifyIntent.current = track.id;
+      return;
+    }
     if (track?.kind !== 'audio') setReveal(true);
     const media = player.current;
     if (!media) return;
@@ -100,20 +117,26 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
   };
   const showVideo = track?.kind === 'video' && (reveal || playing);
 
-  if (zoom === 'moments') return <MomentMap album={album} tracks={allTracks} back={() => setZoom('record')} />;
+  if (zoom === 'moments') return <MomentMap album={album} tracks={allTracks} back={() => { setZoom('record'); setReveal(isSpotify); }} />;
 
-  return <div className={'album-focus' + (zoom === 'transition' ? ' focus-zooming' : '')}>
+  return <div className={'album-focus' + (zoom === 'transition' ? ' focus-zooming' : '') + (zoom === 'spread' ? ' focus-spread' : '')}>
     <Top title={autoStart ? 'RECEIVED RECORD' : 'BLUE VINYL'} back={back} action={send} actionIcon="plane" actionLabel="여행지로 LP 보내기" />
     <div className="focus-stage zoom-gesture" ref={stage}
       onTouchStart={(event) => { startDistance.current = pinchDistance(event.touches); }}
       onTouchMove={(event) => {
-        if (startDistance.current && pinchDistance(event.touches) > startDistance.current * 1.22) {
+        const distance = pinchDistance(event.touches);
+        if (startDistance.current && distance > startDistance.current * 1.22) {
           startDistance.current = 0;
-          openMoments();
+          if (zoom === 'spread') setZoom('record');
+          else openMoments();
+        } else if (startDistance.current && distance && distance < startDistance.current * .8) {
+          startDistance.current = 0;
+          setZoom('spread');
         }
       }}
       onTouchEnd={() => { startDistance.current = 0; }}
       onTouchCancel={() => { startDistance.current = 0; }}>
+      {zoom === 'spread' && <ScatteredPhotos entries={album.entries} currentPhoto={currentPhoto} />}
       <button className="focus-record" onClick={play} disabled={!track} aria-label={isMedia ? (playing ? '일시정지' : '트랙 재생') : '트랙 열기'}>
         <Vinyl image={art} color={album.color} playing={playing} />
         <svg className="focus-rings" viewBox="0 0 100 100" aria-hidden="true">
@@ -121,16 +144,21 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
             fill="none" stroke={entry.id === track?.id && playing ? '#f1dfae' : '#c4c2bd'} strokeWidth=".12" opacity={entry.id === track?.id && playing ? '.45' : '.16'} />)}
         </svg>
       </button>
-      <ReplayArm playing={playing} tracks={tracks} track={track} choose={select} toggle={play} stop={stop} stage={stage} />
-      <button className="focus-zoom" onClick={openMoments} disabled={zoom === 'transition'}>
-        <Icon name="zoom" size={16} /> LP 확대
-      </button>
+      <ReplayArm playing={playing} tracks={tracks} track={track} choose={select} toggle={play} stop={stop} stage={stage} view={zoom} />
+      <div className="focus-view-controls">
+        <button className="focus-zoom" onClick={() => setZoom(zoom === 'spread' ? 'record' : 'spread')} disabled={zoom === 'transition'} aria-pressed={zoom === 'spread'}>
+          <Icon name={zoom === 'spread' ? 'zoom' : 'zoom-out'} size={16} />{zoom === 'spread' ? 'LP 보기' : 'LP 축소'}
+        </button>
+        <button className="focus-zoom" onClick={openMoments} disabled={zoom === 'transition'}>
+          <Icon name="zoom" size={16} /> LP 확대
+        </button>
+      </div>
     </div>
     <div className="focus-bottom">
       <h1>{albumTitle(album)}</h1>
       {track && <div className="focus-track">
         <button className="icon-button" aria-label="이전 트랙" disabled={index <= 0} onClick={() => move(-1)}><Icon name="back" size={16} /></button>
-        <button className="focus-track-name" onClick={play} aria-label={isSpotify ? track.name + ' · Spotify 플레이어 열기' : undefined}><Icon name={isMedia ? (playing ? 'pause' : 'play') : isSpotify ? 'audio' : 'list'} size={15} /><span>{track.name}</span></button>
+        <button className="focus-track-name" onClick={play} aria-label={isSpotify ? track.name + (playing ? ' · 일시정지' : ' · Spotify 재생') : undefined}><Icon name={playing ? 'pause' : isMedia || isSpotify ? 'play' : 'list'} size={15} /><span>{track.name}</span></button>
         <button className="icon-button" aria-label="다음 트랙" disabled={index >= tracks.length - 1} onClick={() => move(1)}><Icon name="next" size={16} /></button>
       </div>}
       {track && <div className="focus-progress" aria-label={String(index + 1) + ' / ' + tracks.length + ' 트랙'}>
@@ -138,7 +166,14 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
           onClick={() => select(entry, playing)} />) : <span>{index + 1} / {tracks.length}</span>}
       </div>}
       {isSpotify && reveal && <div className="focus-spotify" aria-label="기록한 Spotify 곡">
-        <SpotifyPlayer song={track.spotify} />
+        <SpotifyPlayer key={track.id} song={track.spotify} controllerRef={spotifyController}
+          onPlaying={(value) => { if (activeTrack.current === track.id) setPlaying(value); }}
+          onReady={(controller) => {
+            if (activeTrack.current === track.id && spotifyIntent.current === track.id) {
+              spotifyIntent.current = '';
+              controller.resume();
+            }
+          }} />
       </div>}
       {!track && <p className="muted">아직 트랙이 없어요.</p>}
       {save && <button className="focus-save" disabled={busy} onClick={save}>내 선반에 저장</button>}

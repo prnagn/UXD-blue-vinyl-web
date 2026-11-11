@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { addDelivery, albumArt, albumFile, deliverySchedule, demos, importAlbum, loadAlbums, loadInbox, localDay, localTime, resolveDelivery, saveAlbum, trackArt } from './archive';
+import { addDelivery, albumArt, albumFile, deliverySchedule, demos, importAlbum, loadAlbums, loadInbox, localDay, localTime, resetArchive, resolveDelivery, saveAlbum, trackArt } from './archive';
 import { AlbumPlayer } from './album-player';
 import { ArtPicker } from './art-picker';
 import { BlankRecord, TripDetails } from './trip-details';
@@ -10,6 +10,8 @@ import { ReturnMail, ShippingScreen } from './shipping';
 import { TripMoment } from './trip-moment';
 import { LiveCapture } from './live-capture';
 import { useSpotify } from './spotify';
+import { SpotifyPlaybackContext } from './spotify-context';
+import { reorderMoments } from './moment-groups';
 import { Inbox } from './inbox';
 import { Arm, Icon, Plane, PullSleeve, SleeveFace, Top, Vinyl, albumTitle, dateLabel, entryIcons, useMedia } from './ui';
 import { Recorder, TrackMedia } from './recorder';
@@ -209,8 +211,9 @@ function App() {
   }
 
   async function saveLiveCapture(capture) {
-    if (!Object.hasOwn(capture, 'confirmedSpotify')) capture.confirmedSpotify = await spotify.captureTrack();
-    const stamp = { day: localDay(capture.at), time: localTime(capture.at), captureId: crypto.randomUUID(), spotify: capture.confirmedSpotify || undefined };
+    const sequence = album.entries.some((entry) => Number.isFinite(entry.sequence))
+      ? album.entries.reduce((max, entry, index) => Math.max(max, entry.sequence ?? index), -1) + 1 : undefined;
+    const stamp = { day: localDay(capture.at), time: localTime(capture.at), captureId: crypto.randomUUID(), spotify: capture.spotify || undefined, sequence };
     const photoId = capture.photo ? crypto.randomUUID() : undefined;
     const entries = [];
     if (capture.photo) entries.push({ ...stamp, id: photoId, kind: 'photo', name: '여행의 순간', blob: capture.photo });
@@ -246,6 +249,12 @@ function App() {
       setMomentNote('');
       setEngraving(true);
     }
+  }
+
+  async function saveMomentPlace(place, ids) {
+    const engraved = new Set((album.grooves || []).flatMap((groove) => groove.entryIds));
+    const selected = ids ? new Set(ids) : null;
+    return persist({ ...album, entries: album.entries.map((entry) => entry.day === today && !engraved.has(entry.id) && (!selected || selected.has(entry.id)) ? { ...entry, place } : entry) });
   }
 
   function attach(event, fieldRecording = false) {
@@ -421,7 +430,21 @@ function App() {
     } else go(page === 'review' ? reviewFrom : 'home');
   };
 
-  return <div className="desk">
+  async function formatArchive() {
+    if (saving.current) return;
+    saving.current = true;
+    setBusy(true);
+    try {
+      await resetArchive(() => setNotice('다른 Blue Vinyl 창을 닫으면 초기화를 완료합니다.'));
+      setRecords([]); setInbox([]); setId(''); setMomentNote(''); setTrackId('');
+      setPreview(''); setPreviewDelivery(null); setShareLink('');
+      go('home');
+      setNotice('기록을 초기화했어요.');
+    } catch (failure) { setNotice(failure.message || '기록을 초기화하지 못했어요.'); }
+    finally { saving.current = false; setBusy(false); }
+  }
+
+  return <SpotifyPlaybackContext.Provider value={{ ...spotify, openSettings: () => setSheet('settings') }}><div className="desk">
     <aside className="desk-brand" aria-hidden="true"><Icon name="disc" size={26} /><span>BLUE VINYL</span><small>TRAVEL RECORDS</small></aside>
     <div className={'app ' + (page === 'home' ? 'home-app' : '')}>
       <main className={'screen ' + page} ref={main}>
@@ -446,11 +469,8 @@ function App() {
             </div>)}
           </section>
           <div className="home-foot">
-            <span>BLUE VINYL · 33⅓ RPM</span>
+            <button className="home-settings" aria-label="설정" disabled={!loaded} onClick={() => { setNotice(''); setSheet('settings'); }}><Icon name="settings" size={19} /></button>
             <div className="home-foot-actions">
-              <button disabled={spotify.connecting} onClick={() => spotify.connected ? spotify.disconnect() : spotify.connect('')}>
-                <Icon name="audio" size={13} /> {spotify.connected ? 'Spotify 연결 해제' : 'Spotify 연결'}
-              </button>
               <button onClick={() => go('map')}><Icon name="pin" size={13} /> 여행 지도</button>
             </div>
           </div>
@@ -465,11 +485,11 @@ function App() {
 
         {page === 'trip' && album && <LiveCapture album={album} entries={orderedEntries.filter((entry) => entry.day === today)}
           save={saveLiveCapture} next={() => go('moment-summary')} home={goHome}
-          spotify={spotify.track} busy={busy} />}
+          spotify={spotify.track} prepareRecording={spotify.prepareRecording} busy={busy} />}
         {page === 'moment-summary' && album && <TripMoment album={album} entries={orderedEntries.filter((entry) => entry.day === today)}
           day={today}
           note={momentNote} setNote={setMomentNote} home={goHome}
-          capture={() => go('trip')} press={pressMoment} busy={busy} />}
+          capture={() => go('trip')} press={pressMoment} savePlace={saveMomentPlace} reorder={(ids) => persist(reorderMoments(album, ids))} busy={busy} />}
 
         {page === 'record' && album && <>
           <Top title="FIELD RECORDING" back={() => go('trip')} />
@@ -524,10 +544,22 @@ function App() {
         play={playDelivery} save={(delivery) => finishDelivery(delivery, true)}
         discard={(delivery) => finishDelivery(delivery, false)} busy={busy} notice={notice} />}
       {sheet === 'finish-journey' && <JourneyConfirm confirm={confirmJourney} close={() => setSheet('')} />}
-      {sheet && sheet !== 'inbox' && sheet !== 'finish-journey' && <Sheet key={sheet} close={() => setSheet('')} title={{
+      {sheet && sheet !== 'inbox' && sheet !== 'finish-journey' && <Sheet key={sheet} busy={busy} close={() => { if (!busy) setSheet(''); }} title={{
+        settings: '설정', format: '기록 초기화',
         add: '트랙 추가', memo: editId ? '메모 편집' : '여행 메모',
         edit: '트랙 편집', art: artTrack ? '트랙 사진 선택' : 'LP 커버 선택',
       }[sheet]}>
+        {sheet === 'settings' && <>
+          <button className="sheet-row" disabled={spotify.connecting} onClick={() => spotify.connected && !spotify.needsReconnect ? spotify.disconnect() : spotify.connect(album?.phase === 'trip' ? album.id : '')}>
+            <Icon name="audio" />{spotify.needsReconnect ? 'Spotify 다시 연결' : spotify.connected ? 'Spotify 연결 해제' : 'Spotify 연결'}
+          </button>
+          <button className="sheet-row" onClick={() => { setNotice(''); setSheet('format'); }}><Icon name="reset" />기록 초기화</button>
+          {spotify.error && <p className="error" role="status">{spotify.error}</p>}
+        </>}
+        {sheet === 'format' && <div className="format-confirm">
+          <h3>Do you want format?</h3>
+          <div><button className="primary" disabled={busy} onClick={formatArchive}>yes</button><button className="secondary" disabled={busy} onClick={() => setSheet('settings')}>no</button></div>
+        </div>}
         {sheet === 'art' && album && <ArtPicker album={album} track={artTrack} choose={saveArt} upload={uploadArt} busy={busy} />}
         {sheet === 'add' && <>
           <label className="sheet-row file-label"><Icon name="camera" /> 사진 추가<input type="file" accept="image/*" onChange={attach} /></label>
@@ -553,16 +585,16 @@ function App() {
       </Sheet>}
       {notice && !sheet && <div className="toast" role="status">{notice}</div>}
     </div>
-  </div>;
+  </div></SpotifyPlaybackContext.Provider>;
 }
 
-function Sheet({ title, close, children }) {
+function Sheet({ title, close, children, busy }) {
   const dialog = useRef(null);
   useEffect(() => { dialog.current.showModal(); }, []);
   return <dialog className="sheet-dialog" ref={dialog} onCancel={(event) => { event.preventDefault(); close(); }}
     onClick={(event) => { if (event.target === event.currentTarget) close(); }} aria-labelledby="sheet-title">
     <section className="sheet">
-      <header><h2 id="sheet-title">{title}</h2><button className="icon-button" aria-label="닫기" onClick={close}><Icon name="close" /></button></header>
+      <header><h2 id="sheet-title">{title}</h2><button className="icon-button" aria-label="닫기" disabled={busy} onClick={close}><Icon name="close" /></button></header>
       {children}
     </section>
   </dialog>;

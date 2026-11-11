@@ -95,11 +95,13 @@ function CaptureLines({ session, entries, holding, showGrooves }) {
   return <canvas className="capture-lines" ref={canvas} aria-hidden="true" />;
 }
 
-export function LiveCapture({ album, entries, save, next, home, spotify, busy }) {
-  const media = useCaptureSession(save, spotify);
+export function LiveCapture({ album, entries, save, next, home, spotify, prepareRecording, busy }) {
+  const media = useCaptureSession(save, spotify, prepareRecording);
   const pointer = useRef(null);
   const shot = useMedia(media.shot);
   const holding = media.phase === 'holding';
+  const pressing = holding || media.phase === 'preparing';
+  const song = media.phase !== 'idle' ? media.recordingSong || spotify : spotify;
   const locked = busy || media.saving || media.unsaved || media.phase !== 'idle';
   const engraved = new Set((album.grooves || []).flatMap((groove) => groove.entryIds));
   const hasPhoto = entries.some((entry) => entry.kind === 'photo' && !engraved.has(entry.id));
@@ -112,13 +114,13 @@ export function LiveCapture({ album, entries, save, next, home, spotify, busy })
 
   return <section className={'live-capture phase-' + media.phase + ' camera-' + media.cameraState} aria-label="순간 녹화">
     <div className="capture-disc" aria-hidden="true" />
-    <CaptureLines session={media.session} entries={entries} holding={holding} showGrooves={media.phase !== 'idle'} />
+    <CaptureLines session={media.session} entries={entries} holding={holding} showGrooves={media.phase !== 'idle' && media.phase !== 'preparing'} />
     <div className="live-navigation">
       <button className="icon-button" aria-label="선반으로 돌아가기" onClick={home} disabled={locked}><Icon name="list" size={18} /></button>
       {hasPhoto && <button className="icon-button" aria-label="기록 확인" onClick={next} disabled={locked}><Icon name="next" size={22} /></button>}
     </div>
-    {spotify && <a className="capture-now-playing" href={spotify.url} target="_blank" rel="noreferrer">
-      {spotify.image && <img src={spotify.image} alt="" />}<span><strong>{spotify.name}</strong><small>{spotify.artist}</small></span>
+    {song && <a className="capture-now-playing" href={song.url} target="_blank" rel="noreferrer">
+      {song.image && <img src={song.image} alt="" />}<span><strong>{song.name}</strong><small>{song.artist}</small></span>
     </a>}
     <div className="capture-lens" aria-label={media.cameraState === 'on' ? '카메라 미리보기' : '카메라 꺼짐'}>
       <div className="lens-off" />
@@ -126,7 +128,8 @@ export function LiveCapture({ album, entries, save, next, home, spotify, busy })
       {shot && media.phase === 'exposing' && <img className="camera-shot" src={shot} alt="방금 촬영한 사진" />}
       {media.phase === 'exposing' && <div className="camera-flash" aria-hidden="true" />}
     </div>
-    {media.error && <div className="live-capture-error" role="alert">{media.error}
+    {media.phase === 'preparing' && <div className="capture-preparing" role="status">녹음 준비 중</div>}
+    {(media.error || media.musicNotice) && <div className="live-capture-error" role="alert">{media.error || media.musicNotice}
       {media.unsaved && <button onClick={media.retrySave} disabled={media.saving}>다시 저장</button>}
     </div>}
     <div className="live-controls">
@@ -134,8 +137,8 @@ export function LiveCapture({ album, entries, save, next, home, spotify, busy })
         aria-pressed={media.cameraState === 'on'} disabled={locked} onClick={media.toggleCamera}>
         <Icon name={media.cameraState === 'off' ? 'camera-off' : 'camera'} size={23} />
       </button>
-      <button className={'live-record' + (holding ? ' is-holding' : '')} aria-label="길게 눌러 순간 기록" aria-pressed={holding}
-        disabled={busy || media.saving || media.unsaved || (media.phase !== 'idle' && !holding)}
+      <button className={'live-record' + (pressing ? ' is-holding' : '')} aria-label="길게 눌러 순간 기록" aria-pressed={pressing}
+        disabled={busy || media.saving || media.unsaved || (media.phase !== 'idle' && !pressing)}
         onPointerDown={(event) => {
           if (event.button !== 0 || pointer.current !== null || !media.begin()) return;
           pointer.current = event.pointerId;
@@ -148,7 +151,7 @@ export function LiveCapture({ album, entries, save, next, home, spotify, busy })
           if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) { event.preventDefault(); media.begin(); }
         }}
         onKeyUp={(event) => { if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); media.finish(true); } }}
-        onBlur={() => { if (holding && pointer.current === null) media.finish(false); }}><span /></button>
+        onBlur={() => { if (pressing && pointer.current === null) media.finish(false); }}><span /></button>
     </div>
   </section>;
 }

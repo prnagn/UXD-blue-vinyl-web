@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createServer } from 'vite';
 import { startAmbient } from '../src/ambient-audio.js';
 import { parkedAngle, needleRadius, trackRadius, trackAngle } from '../src/replay-geometry.js';
+import './capture.test.mjs';
 
 globalThis.FileReader = class {
   async readAsDataURL(blob) {
@@ -51,7 +52,8 @@ for (const length of [.2, 1, 9, 300]) {
 
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' });
 try {
-  const { replayTracks, albumPlaybackTracks, trackArt, albumFile, importAlbum } = await server.ssrLoadModule('/src/archive.js');
+  const { replayTracks, albumPlaybackTracks, trackArt, albumFile, importAlbum, resetArchive } = await server.ssrLoadModule('/src/archive.js');
+  const { pendingMoments, reorderMoments } = await server.ssrLoadModule('/src/moment-groups.js');
   const song = { id: '1234567890123456789012', name: 'Saved Song', artist: 'Artist', url: 'https://open.spotify.com/track/1234567890123456789012' };
   const p1 = { id: 'p1', kind: 'photo', src: '/one.jpg', day: '2026-11-11', time: '09:01', captureId: 'one', spotify: song };
   const a1 = { id: 'a1', kind: 'audio', fieldRecording: true, blob: new Blob(['audio'], { type: 'audio/webm' }), day: p1.day, time: p1.time, captureId: 'one', spotify: song, waveform: [.2, .5], durationMs: 1000 };
@@ -59,6 +61,13 @@ try {
   const a2 = { ...a1, id: 'a2', time: p2.time, captureId: 'two', spotify: undefined };
   const standalone = { ...p2, id: 'p3', captureId: 'three', time: '11:02', spotify: song };
   const album = { id: 'qa', name: 'QA', color: '#b99086', entries: [a2, p2, { id: 'memo', kind: 'memo' }, p1, a1, standalone], grooves: [] };
+  const reordered = reorderMoments(album, ['p3', 'p1', 'p2']);
+  assert.deepEqual(pendingMoments(reordered).map(group => group.id), ['p3', 'p1', 'p2']);
+  assert.deepEqual(replayTracks(reordered.entries).map(track => track.id), ['p3', 'a1', 'a2'], 'custom moment order must override original timestamps');
+  assert.deepEqual(pendingMoments(reordered)[1].entries.map(entry => entry.id), ['p1', 'a1'], 'photo, recording and song must move as one moment');
+  assert.deepEqual(new Set(reordered.entries.map(entry => entry.id)), new Set(album.entries.map(entry => entry.id)));
+  const engraved = { ...album, grooves: [{ entryIds: ['p1', 'a1'] }] };
+  assert.equal(reorderMoments(engraved, ['p1', 'p2']), engraved, 'already engraved moments must not be reordered');
   assert.deepEqual(replayTracks(album.entries).map(t => t.id), ['a1', 'a2', 'p3']);
   const playlist = albumPlaybackTracks(album.entries);
   assert.deepEqual(playlist.map(t => t.id), ['a1', 'a1:spotify', 'a2', 'p3']);
@@ -77,22 +86,50 @@ try {
   assert(!summary.includes('capture-songs') && !summary.includes('노래 추가'), 'no empty song card or manual add action');
   const withSong = renderToStaticMarkup(React.createElement(TripMoment, { album, entries: [p1, a1], note: '', day: p1.day }));
   assert(withSong.includes('Saved Song') && !withSong.includes('노래 추가'));
+  assert(withSong.includes('moment-carousel') && withSong.includes('새로운 기록'), 'the last carousel slot must open a new recording');
   const { AlbumPlayer } = await server.ssrLoadModule('/src/album-player.jsx');
   const first = renderToStaticMarkup(React.createElement(AlbumPlayer, { album, tracks: album.entries, track: a1 }));
   const second = renderToStaticMarkup(React.createElement(AlbumPlayer, { album, tracks: album.entries, track: a2 }));
   assert(first.includes('/one.jpg') && second.includes('/two.jpg'), 'selected audio must change the center photo');
   assert(first.includes('--focus-arm-angle:-35deg'), 'paused arm must be parked');
   const spotifyView = renderToStaticMarkup(React.createElement(AlbumPlayer, { album, tracks: album.entries, track: a2, selectedId: 'a1:spotify' }));
-  assert(spotifyView.includes('Spotify · Saved Song') && spotifyView.includes('open.spotify.com/embed/track/' + song.id), 'song selection must open its Spotify player');
+  assert(spotifyView.includes('Saved Song') && spotifyView.includes('open.spotify.com/track/' + song.id) && !spotifyView.includes('<iframe'), 'song must use app controls without an embedded player');
   assert(spotifyView.includes('/one.jpg') && !spotifyView.includes('<audio'), 'Spotify selection must use its own photo and stop ambient audio');
+  const { HomeTurntable } = await server.ssrLoadModule('/src/home-turntable.jsx');
+  const home = renderToStaticMarkup(React.createElement(HomeTurntable, { album: { ...album, art: { trackId: p1.id } } }));
+  assert(home.includes('open.spotify.com/track/' + song.id) && home.includes('Saved Song') && !home.includes('<iframe'), 'home playback must select Spotify without an embedded player');
+  assert(!home.includes('<audio'), 'home must never fall back to environmental recordings');
+  assert(/class="vinyl\s+rotating"[^>]*>[\s\S]*?<img src="\/one.jpg"/.test(home), 'the cover photo must stay inside the rotating LP');
+  const noSongHome = renderToStaticMarkup(React.createElement(HomeTurntable, { album: { ...album, entries: [p2, a2] } }));
+  assert(!noSongHome.includes('<audio') && !noSongHome.includes('<iframe'), 'an album without Spotify metadata must not invent a song');
   const { MomentMap } = await server.ssrLoadModule('/src/moment-map.jsx');
   const map = renderToStaticMarkup(React.createElement(MomentMap, { album, tracks: album.entries }));
   assert.equal((map.match(/class="moment-pin"/g) || []).length, 3, 'field recordings and song-only moments must get pins');
+  const { ScatteredPhotos } = await server.ssrLoadModule('/src/album-photos.jsx');
+  const photos = renderToStaticMarkup(React.createElement(ScatteredPhotos, { entries: album.entries, currentPhoto: p1 }));
+  assert(!photos.includes('/one.jpg') && photos.includes('/two.jpg'), 'zoom-out photos must exclude the current LP photo');
+  assert.equal((photos.match(/class="scattered-photo"/g) || []).length, 2);
   const shared = { ...album, entries: [p1, a1].map(t => t.kind === 'photo' ? { ...t, src: undefined, blob: new Blob(['photo'], { type: 'image/jpeg' }) } : t) };
   const restored = await importAlbum(await albumFile(shared));
   const restoredAudio = restored.entries.find(t => t.kind === 'audio');
   assert.equal(restoredAudio.captureId, 'one');
   assert.equal(trackArt(restored, restoredAudio).captureId, 'one');
   assert.equal(restoredAudio.spotify.id, song.id);
+  const { placeLabel } = await server.ssrLoadModule('/src/moment-location.jsx');
+  assert.equal(placeLabel({ properties: { name: 'Louvre Museum', street: 'Rue de Rivoli' } }), 'Louvre Museum');
+  assert.equal(placeLabel({ properties: { street: 'Rue de Rivoli', housenumber: '99' } }), 'Rue de Rivoli 99');
+  assert.equal(placeLabel(undefined), '');
+  let deletions = 0;
+  globalThis.indexedDB = { deleteDatabase: name => {
+    deletions++;
+    assert.equal(name, 'blue-vinyl-archive', 'only this app database may be reset');
+    const request = {};
+    queueMicrotask(() => request.onsuccess());
+    return request;
+  } };
+  assert.equal(deletions, 0);
+  await resetArchive();
+  assert.equal(deletions, 1);
+  delete globalThis.indexedDB;
 } finally { await server.close(); }
-console.log('PASS: tonearm rings (3 widths), ambient halves/fades/manual transitions, replay order/photos/pins, song UI, archive round-trip');
+console.log('PASS: recording snapshots, carousel group order, photo/song pairing, GPS labels, scoped database reset, tonearm geometry, archive round-trip');

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { replayTracks, trackArt } from './archive';
 import { albumTitle, Icon, Top, useMedia } from './ui';
 import { MomentPlayback } from './moment-playback';
@@ -10,6 +10,7 @@ export function MomentMap({ album, tracks, back }) {
   const [group, setGroup] = useState(0);
   const [id, setId] = useState('');
   const [playing, setPlaying] = useState(false);
+  const pinchStart = useRef(0);
   const moments = replayTracks(tracks).filter((entry) => entry.kind === 'audio' || entry.spotify);
   const selected = moments.find((entry) => entry.id === id);
   const photo = useMedia(trackArt(album, selected));
@@ -25,7 +26,17 @@ export function MomentMap({ album, tracks, back }) {
     setGroup(next);
   }
 
-  return <div className="moment-map">
+  const distance = (touches) => touches.length === 2 ? Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY) : 0;
+  return <div className="moment-map"
+    onTouchStart={(event) => { pinchStart.current = distance(event.touches); }}
+    onTouchMove={(event) => {
+      const current = distance(event.touches);
+      if (pinchStart.current && current && current < pinchStart.current * .8) {
+        pinchStart.current = 0;
+        back();
+      }
+    }}
+    onTouchEnd={() => { pinchStart.current = 0; }} onTouchCancel={() => { pinchStart.current = 0; }}>
     <Top title="MOMENT REPLAY" back={back} />
     <div className="moment-heading">
       <h1>{albumTitle(album)}</h1>

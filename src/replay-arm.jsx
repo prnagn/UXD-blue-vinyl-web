@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { parkedAngle as parked, needleRadius as distance, trackRadius as radius, trackAngle } from './replay-geometry';
 
-export function ReplayArm({ playing, tracks, track, choose, toggle, stop, stage }) {
+export function ReplayArm({ playing, tracks, track, choose, toggle, stop, stage, view }) {
   const arm = useRef(null);
   const pointer = useRef(null);
   const [drag, setDrag] = useState(null);
@@ -14,10 +14,11 @@ export function ReplayArm({ playing, tracks, track, choose, toggle, stop, stage 
     if (!element || !record) return null;
     const area = stage.current.getBoundingClientRect();
     const disc = record.getBoundingClientRect();
+    const matrix = element.querySelector('svg')?.getScreenCTM();
     return {
-      x: area.x + element.offsetLeft + element.offsetWidth * 107 / 138,
-      y: area.y + element.offsetTop - element.offsetHeight * .57 + element.offsetHeight * 36 / 236,
-      scale: element.offsetWidth / 138,
+      x: matrix ? matrix.a * 107 + matrix.c * 36 + matrix.e : area.x + element.offsetLeft + element.offsetWidth * 107 / 138,
+      y: matrix ? matrix.b * 107 + matrix.d * 36 + matrix.f : area.y + element.offsetTop - element.offsetHeight * .57 + element.offsetHeight * 36 / 236,
+      scale: matrix ? Math.hypot(matrix.a, matrix.b) : element.offsetWidth / 138,
       cx: disc.x + disc.width / 2, cy: disc.y + disc.height / 2, radius: disc.width / 2,
     };
   }
@@ -25,8 +26,12 @@ export function ReplayArm({ playing, tracks, track, choose, toggle, stop, stage 
   useEffect(() => {
     const observer = new ResizeObserver(() => setLayout(measure()));
     if (stage.current) observer.observe(stage.current);
+    const record = stage.current?.querySelector('.focus-record');
+    if (record) observer.observe(record);
+    if (arm.current) observer.observe(arm.current);
+    setLayout(measure());
     return () => observer.disconnect();
-  }, [stage]);
+  }, [stage, view]);
 
   // The same physical needle position selects the ring and positions the arm.
   const angle = drag ?? (playing ? (layout ? trackAngle(index, tracks.length, layout) : -10 + index / Math.max(1, tracks.length - 1) * 28) : parked);
