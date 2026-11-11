@@ -81,21 +81,11 @@ export function useSpotify(enabled) {
       failure.status = response.status;
       throw failure;
     }
-    if (response.status === 204) return null;
-
-    const text = await response.text();
-
-    try {
-      return JSON.parse(text);
-    } catch {
-      console.error('Spotify 응답 확인', {
-        path,
-        status: response.status,
-        contentType: response.headers.get('content-type'),
-        body: text,
-      });
-      throw new Error(`Spotify 응답 형식 오류: ${path}`);
+    if (response.status === 204 || options.method === 'PUT') {
+      return null;
     }
+
+    return response.json();
   }
 
   function requireControl() {
