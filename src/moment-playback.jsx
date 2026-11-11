@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Icon, useMedia } from './ui';
 import { startAmbient } from './ambient-audio';
+import { SpotifyPlayer } from './spotify-player';
 
 function useAmbient(source, onPlaying) {
   const context = useRef(null);
@@ -123,11 +124,7 @@ export function MomentPlayback({ entry, onPlaying }) {
       <button className="icon-button" aria-label="다음 트랙" disabled={index >= segments.length - 1} onClick={() => choose(segments[index + 1])}><Icon name="skip-next" /></button>
     </div>
     <p className="moment-segment-count" aria-live="polite">{index + 1} / {segments.length}</p>
-    {segment.id === 'spotify' && spotifyOpen && <div className="moment-spotify">
-      <iframe key={song.id} title={'Spotify · ' + song.name} src={'https://open.spotify.com/embed/track/' + song.id + '?theme=0'}
-        width="100%" height="152" frameBorder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" />
-      <a href={'https://open.spotify.com/track/' + song.id} target="_blank" rel="noreferrer">Spotify에서 열기</a>
-    </div>}
+    {segment.id === 'spotify' && spotifyOpen && <SpotifyPlayer song={song} />}
     {ambient.error && <p className="error" role="status">{ambient.error}</p>}
   </section>;
 }

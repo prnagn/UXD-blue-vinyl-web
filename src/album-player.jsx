@@ -1,15 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MomentMap } from './moment-map';
-import { replayTracks, trackArt } from './archive';
+import { albumPlaybackTracks, trackArt } from './archive';
+import { SpotifyPlayer } from './spotify-player';
 import { ReplayArm } from './replay-arm';
 import { trackRadius } from './replay-geometry';
 import { albumTitle, Icon, Top, useMedia, Vinyl } from './ui';
 
-export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, onTrack, back, send, autoStart, save, busy }) {
-  const tracks = replayTracks(allTracks);
-  const track = tracks.find((entry) => entry.id === selectedTrack?.id) || tracks[0];
+export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, selectedId, onTrack, back, send, autoStart, save, busy }) {
+  const tracks = albumPlaybackTracks(allTracks);
+  const track = tracks.find((entry) => entry.id === (selectedId || selectedTrack?.id)) || tracks[0];
   const [playing, setPlaying] = useState(false);
-  const [reveal, setReveal] = useState(false);
+  const [reveal, setReveal] = useState(track?.kind === 'spotify');
   const [error, setError] = useState('');
   const [zoom, setZoom] = useState('record');
   const player = useRef(null);
@@ -21,6 +22,7 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, on
   const source = useMedia(track);
   const art = useMedia(trackArt(album, track));
   const isMedia = track?.kind === 'audio' || track?.kind === 'video';
+  const isSpotify = track?.kind === 'spotify';
   useEffect(() => () => clearTimeout(zoomTimer.current), []);
 
   useEffect(() => {
@@ -51,13 +53,14 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, on
   function select(entry, autoplay = false) {
     if (!entry) return;
     stop();
-    wantsPlayback.current = autoplay;
-    setReveal(false);
+    wantsPlayback.current = autoplay && entry.kind !== 'spotify';
+    setReveal(entry.kind === 'spotify');
     if (entry.id === track?.id && autoplay) start(player.current);
     else onTrack(entry);
   }
 
   async function play() {
+    if (isSpotify) { setReveal(true); return; }
     if (track?.kind !== 'audio') setReveal(true);
     const media = player.current;
     if (!media) return;
@@ -97,7 +100,7 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, on
   };
   const showVideo = track?.kind === 'video' && (reveal || playing);
 
-  if (zoom === 'moments') return <MomentMap album={album} tracks={tracks} back={() => setZoom('record')} />;
+  if (zoom === 'moments') return <MomentMap album={album} tracks={allTracks} back={() => setZoom('record')} />;
 
   return <div className={'album-focus' + (zoom === 'transition' ? ' focus-zooming' : '')}>
     <Top title={autoStart ? 'RECEIVED RECORD' : 'BLUE VINYL'} back={back} action={send} actionIcon="plane" actionLabel="여행지로 LP 보내기" />
@@ -127,12 +130,15 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, on
       <h1>{albumTitle(album)}</h1>
       {track && <div className="focus-track">
         <button className="icon-button" aria-label="이전 트랙" disabled={index <= 0} onClick={() => move(-1)}><Icon name="back" size={16} /></button>
-        <button className="focus-track-name" onClick={play}><Icon name={isMedia ? (playing ? 'pause' : 'play') : 'list'} size={15} /><span>{track.name}</span></button>
+        <button className="focus-track-name" onClick={play} aria-label={isSpotify ? track.name + ' · Spotify 플레이어 열기' : undefined}><Icon name={isMedia ? (playing ? 'pause' : 'play') : isSpotify ? 'audio' : 'list'} size={15} /><span>{track.name}</span></button>
         <button className="icon-button" aria-label="다음 트랙" disabled={index >= tracks.length - 1} onClick={() => move(1)}><Icon name="next" size={16} /></button>
       </div>}
       {track && <div className="focus-progress" aria-label={String(index + 1) + ' / ' + tracks.length + ' 트랙'}>
         {tracks.length <= 12 ? tracks.map((entry, i) => <button type="button" key={entry.id} className={i === index ? 'active' : ''} aria-label={(i + 1) + '번 트랙'} aria-current={i === index ? 'true' : undefined}
           onClick={() => select(entry, playing)} />) : <span>{index + 1} / {tracks.length}</span>}
+      </div>}
+      {isSpotify && reveal && <div className="focus-spotify" aria-label="기록한 Spotify 곡">
+        <SpotifyPlayer song={track.spotify} />
       </div>}
       {!track && <p className="muted">아직 트랙이 없어요.</p>}
       {save && <button className="focus-save" disabled={busy} onClick={save}>내 선반에 저장</button>}
@@ -143,7 +149,7 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, on
       <button className="icon-button" aria-label="트랙 닫기" onClick={() => { player.current?.pause(); setReveal(false); }}><Icon name="close" /></button>
       <video key={track.id} {...events} controls playsInline preload="metadata" />
     </div>}
-    {reveal && !isMedia && <section className="focus-media" aria-label="트랙 내용">
+    {reveal && !isMedia && !isSpotify && <section className="focus-media" aria-label="트랙 내용">
       <header><h2>{track.name}</h2><button className="icon-button" aria-label="트랙 닫기" onClick={() => setReveal(false)}><Icon name="close" /></button></header>
       {track.kind === 'photo' && source && <img className="media-photo" src={source} alt={track.name} />}
       {track.kind === 'memo' && <blockquote className="memo-view">{track.note}</blockquote>}

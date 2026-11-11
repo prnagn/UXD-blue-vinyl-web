@@ -51,7 +51,7 @@ for (const length of [.2, 1, 9, 300]) {
 
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' });
 try {
-  const { replayTracks, trackArt, albumFile, importAlbum } = await server.ssrLoadModule('/src/archive.js');
+  const { replayTracks, albumPlaybackTracks, trackArt, albumFile, importAlbum } = await server.ssrLoadModule('/src/archive.js');
   const song = { id: '1234567890123456789012', name: 'Saved Song', artist: 'Artist', url: 'https://open.spotify.com/track/1234567890123456789012' };
   const p1 = { id: 'p1', kind: 'photo', src: '/one.jpg', day: '2026-11-11', time: '09:01', captureId: 'one', spotify: song };
   const a1 = { id: 'a1', kind: 'audio', fieldRecording: true, blob: new Blob(['audio'], { type: 'audio/webm' }), day: p1.day, time: p1.time, captureId: 'one', spotify: song, waveform: [.2, .5], durationMs: 1000 };
@@ -60,6 +60,13 @@ try {
   const standalone = { ...p2, id: 'p3', captureId: 'three', time: '11:02', spotify: song };
   const album = { id: 'qa', name: 'QA', color: '#b99086', entries: [a2, p2, { id: 'memo', kind: 'memo' }, p1, a1, standalone], grooves: [] };
   assert.deepEqual(replayTracks(album.entries).map(t => t.id), ['a1', 'a2', 'p3']);
+  const playlist = albumPlaybackTracks(album.entries);
+  assert.deepEqual(playlist.map(t => t.id), ['a1', 'a1:spotify', 'a2', 'p3']);
+  assert.equal(playlist[1].kind, 'spotify');
+  assert.equal(playlist[1].blob, undefined, 'Spotify track must not play the ambient blob');
+  assert.equal(trackArt(album, playlist[1]).id, 'p1', 'song must retain its captured moment photo');
+  assert.equal(trackArt(album, playlist.at(-1)).id, 'p3');
+  assert.deepEqual(albumPlaybackTracks([{ ...a2, spotify: { id: 'invalid' } }]).map(t => t.id), ['a2']);
   assert.equal(trackArt(album, a1).id, 'p1');
   assert.equal(trackArt(album, a2).id, 'p2');
   assert.equal(trackArt(album, { ...a2, captureId: undefined }).id, 'p2');
@@ -75,6 +82,9 @@ try {
   const second = renderToStaticMarkup(React.createElement(AlbumPlayer, { album, tracks: album.entries, track: a2 }));
   assert(first.includes('/one.jpg') && second.includes('/two.jpg'), 'selected audio must change the center photo');
   assert(first.includes('--focus-arm-angle:-35deg'), 'paused arm must be parked');
+  const spotifyView = renderToStaticMarkup(React.createElement(AlbumPlayer, { album, tracks: album.entries, track: a2, selectedId: 'a1:spotify' }));
+  assert(spotifyView.includes('Spotify · Saved Song') && spotifyView.includes('open.spotify.com/embed/track/' + song.id), 'song selection must open its Spotify player');
+  assert(spotifyView.includes('/one.jpg') && !spotifyView.includes('<audio'), 'Spotify selection must use its own photo and stop ambient audio');
   const { MomentMap } = await server.ssrLoadModule('/src/moment-map.jsx');
   const map = renderToStaticMarkup(React.createElement(MomentMap, { album, tracks: album.entries }));
   assert.equal((map.match(/class="moment-pin"/g) || []).length, 3, 'field recordings and song-only moments must get pins');

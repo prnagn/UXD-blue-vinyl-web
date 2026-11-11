@@ -1,7 +1,7 @@
 import React from 'react';
 import { albumTitle, Icon, useMedia } from './ui';
 
-export function TripMoment({ album, entries, day, note, setNote, menu, capture, press, busy }) {
+export function TripMoment({ album, entries, day, note, setNote, home, capture, press, busy }) {
   const grooves = album.grooves || [];
   const engravedIds = new Set(grooves.flatMap((groove) => groove.entryIds));
   const photo = useMedia(entries.findLast((entry) => entry.kind === 'photo' && !engravedIds.has(entry.id)));
@@ -10,7 +10,7 @@ export function TripMoment({ album, entries, day, note, setNote, menu, capture, 
     <header className="moment-capture-header">
       <h1>{albumTitle(album)}</h1>
       <span>MOMENT {grooves.length + 1}</span>
-      <button className="icon-button" onClick={menu} aria-label="여행 메뉴"><Icon name="list" size={17} /></button>
+      <button className="icon-button" onClick={home} disabled={busy} aria-label="선반으로 돌아가기"><Icon name="list" size={17} /></button>
     </header>
     <div className="capture-body">
       <button className={'capture-photo' + (photo ? ' captured' : '')} onClick={capture} aria-label="사진 촬영 화면 열기" disabled={busy}>

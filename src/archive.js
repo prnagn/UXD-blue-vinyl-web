@@ -125,6 +125,20 @@ export function replayTracks(entries) {
     .sort((a, b) => ((a.day || '') + (a.time || '')).localeCompare((b.day || '') + (b.time || '')));
 }
 
+// Keep the saved moment intact; its Spotify song is a separate player track.
+export function albumPlaybackTracks(entries) {
+  return replayTracks(entries).flatMap((entry) => {
+    const song = entry.spotify;
+    if (!song || !/^[a-zA-Z0-9]{22}$/.test(song.id || '')) return [entry];
+    const spotify = {
+      ...entry, id: entry.kind === 'photo' ? entry.id : entry.id + ':spotify',
+      kind: 'spotify', name: song.name, artist: song.artist, blob: undefined, src: undefined,
+      art: entry.kind === 'photo' ? { trackId: entry.id } : entry.art,
+    };
+    return entry.kind === 'photo' ? [spotify] : [entry, spotify];
+  });
+}
+
 async function encodeMedia({ blob, src }) {
   const response = src && !blob ? await fetch(src) : null;
   if (response && !response.ok) throw new Error('미디어를 열지 못했어요.');

@@ -11,7 +11,7 @@ import { TripMoment } from './trip-moment';
 import { LiveCapture } from './live-capture';
 import { useSpotify } from './spotify';
 import { Inbox } from './inbox';
-import { Arm, Icon, Plane, PullSleeve, Top, Vinyl, albumTitle, dateLabel, entryIcons, useMedia } from './ui';
+import { Arm, Icon, Plane, PullSleeve, SleeveFace, Top, Vinyl, albumTitle, dateLabel, entryIcons, useMedia } from './ui';
 import { Recorder, TrackMedia } from './recorder';
 import { TravelMap } from './map';
 import './style.css';
@@ -440,26 +440,35 @@ function App() {
               <button className={'sleeve sleeve-' + index % 3} aria-expanded={preview === item.id}
                 onClick={() => setPreview(preview === item.id ? '' : item.id)}>
                 <span className="spine"><strong>{albumTitle(item)}</strong><span>{dateLabel(item.start)}</span>{item.phase === 'trip' && <i />}</span>
-                <span className="sleeve-face" />
+                <SleeveFace album={item} />
               </button>
               {preview === item.id && <PullSleeve album={item} open={() => openAlbum(item)} />}
             </div>)}
           </section>
-          <div className="home-foot"><span>BLUE VINYL · 33⅓ RPM</span><button onClick={() => go('map')}><Icon name="pin" size={13} /> 여행 지도</button></div>
+          <div className="home-foot">
+            <span>BLUE VINYL · 33⅓ RPM</span>
+            <div className="home-foot-actions">
+              <button disabled={spotify.connecting} onClick={() => spotify.connected ? spotify.disconnect() : spotify.connect('')}>
+                <Icon name="audio" size={13} /> {spotify.connected ? 'Spotify 연결 해제' : 'Spotify 연결'}
+              </button>
+              <button onClick={() => go('map')}><Icon name="pin" size={13} /> 여행 지도</button>
+            </div>
+          </div>
+          {spotify.error && <p className="home-spotify-error error" role="status">{spotify.error}</p>}
         </>}
 
-        {page === 'blank' && <BlankRecord back={goHome} enter={() => go('create')} />}
+        {page === 'blank' && <BlankRecord back={goHome} home={goHome} enter={() => go('create')} />}
         {page === 'draft-disc' && album && <BlankRecord enter={editDraftDetails} finish={finishAlbum}
-          menu={() => setSheet('draft-menu')} record={() => go('trip')} grooveCount={album.grooves?.length || 0} engraving={engraving} />}
+          home={goHome} record={() => go('trip')} grooveCount={album.grooves?.length || 0} engraving={engraving} />}
         {page === 'create' && <TripDetails form={form} update={(patch) => setForm((value) => ({ ...value, ...patch }))}
           save={createTrip} busy={busy} back={() => go(editingDetails ? 'draft-disc' : 'blank')} />}
 
         {page === 'trip' && album && <LiveCapture album={album} entries={orderedEntries.filter((entry) => entry.day === today)}
-          save={saveLiveCapture} next={() => go('moment-summary')} menu={() => setSheet('trip-menu')}
+          save={saveLiveCapture} next={() => go('moment-summary')} home={goHome}
           spotify={spotify.track} busy={busy} />}
         {page === 'moment-summary' && album && <TripMoment album={album} entries={orderedEntries.filter((entry) => entry.day === today)}
           day={today}
-          note={momentNote} setNote={setMomentNote} menu={() => setSheet('trip-menu')}
+          note={momentNote} setNote={setMomentNote} home={goHome}
           capture={() => go('trip')} press={pressMoment} busy={busy} />}
 
         {page === 'record' && album && <>
@@ -471,7 +480,7 @@ function App() {
         </>}
 
         {page === 'play' && album && <AlbumPlayer key={album.id} album={album}
-          tracks={tracks} track={track} onTrack={playTrack} back={returnFromPlayer} busy={busy} autoStart={Boolean(previewDelivery)}
+          tracks={tracks} track={track} selectedId={trackId} onTrack={playTrack} back={returnFromPlayer} busy={busy} autoStart={Boolean(previewDelivery)}
           send={previewDelivery ? undefined : () => { setNotice(''); go('send-lp'); }}
           save={previewDelivery ? () => finishDelivery(previewDelivery, true) : undefined} />}
         {page === 'send-lp' && album && <ReturnMail album={album} back={() => go('play')}
@@ -517,7 +526,7 @@ function App() {
       {sheet === 'finish-journey' && <JourneyConfirm confirm={confirmJourney} close={() => setSheet('')} />}
       {sheet && sheet !== 'inbox' && sheet !== 'finish-journey' && <Sheet key={sheet} close={() => setSheet('')} title={{
         add: '트랙 추가', memo: editId ? '메모 편집' : '여행 메모',
-        edit: '트랙 편집', art: artTrack ? '트랙 사진 선택' : 'LP 커버 선택', 'trip-menu': '여행 메뉴', 'draft-menu': 'LP 메뉴',
+        edit: '트랙 편집', art: artTrack ? '트랙 사진 선택' : 'LP 커버 선택',
       }[sheet]}>
         {sheet === 'art' && album && <ArtPicker album={album} track={artTrack} choose={saveArt} upload={uploadArt} busy={busy} />}
         {sheet === 'add' && <>
@@ -539,26 +548,6 @@ function App() {
             <button className="icon-button" disabled={busy || index === 0} onClick={() => moveTrack(entry, -1)} aria-label="위로 이동"><Icon name="up" size={16} /></button>
             <button className="icon-button" disabled={busy || index === tracks.length - 1} onClick={() => moveTrack(entry, 1)} aria-label="아래로 이동"><Icon name="down" size={16} /></button>
           </div>)}
-        </>}
-        {sheet === 'trip-menu' && <>
-          {page === 'moment-summary' && <button className="sheet-row" onClick={() => go('trip')}><Icon name="camera" /> 다시 촬영</button>}
-          {page === 'trip' && orderedEntries.some((entry) => entry.day === today) && <button className="sheet-row" onClick={() => go('moment-summary')}><Icon name="next" /> 기록 확인</button>}
-          <button className="sheet-row" disabled={spotify.connecting} onClick={() => spotify.connected ? spotify.disconnect() : spotify.connect(album.id)}>
-            <Icon name="audio" /> {spotify.connected ? 'Spotify 연결 해제' : 'Spotify 연결'}
-          </button>
-          {spotify.error && <p className="error" role="status">{spotify.error}</p>}
-          <button className="sheet-row" onClick={() => setSheet('add')}><Icon name="plus" /> 트랙 추가</button>
-          <button className="sheet-row" onClick={() => go('record')}><Icon name="mic" /> 현장 녹음</button>
-          <button className="sheet-row" onClick={review}><Icon name="play" /> 오늘의 트랙 감상</button>
-          <button className="sheet-row" onClick={finishAlbum}><Icon name="disc" /> 여행 끝 · LP 프레싱</button>
-          {album.grooves?.length > 0 && <button className="sheet-row" onClick={() => go('draft-disc')}><Icon name="back" /> LP 화면으로 돌아가기</button>}
-          <button className="sheet-row" onClick={goHome}><Icon name="back" /> 선반으로 돌아가기</button>
-        </>}
-        {sheet === 'draft-menu' && <>
-          <button className="sheet-row" onClick={review}><Icon name="play" /> 오늘의 트랙 감상</button>
-          <button className="sheet-row" onClick={editDraftDetails}><Icon name="edit" /> LP 정보 편집</button>
-          <button className="sheet-row" onClick={finishAlbum}><Icon name="disc" /> 여행 끝 · LP 프레싱</button>
-          <button className="sheet-row" onClick={goHome}><Icon name="back" /> 선반으로 돌아가기</button>
         </>}
         {notice && <p className="error" role="status">{notice}</p>}
       </Sheet>}

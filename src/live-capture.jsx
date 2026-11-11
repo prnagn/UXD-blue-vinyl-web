@@ -95,7 +95,7 @@ function CaptureLines({ session, entries, holding, showGrooves }) {
   return <canvas className="capture-lines" ref={canvas} aria-hidden="true" />;
 }
 
-export function LiveCapture({ album, entries, save, next, menu, spotify, busy }) {
+export function LiveCapture({ album, entries, save, next, home, spotify, busy }) {
   const media = useCaptureSession(save, spotify);
   const pointer = useRef(null);
   const shot = useMedia(media.shot);
@@ -114,7 +114,7 @@ export function LiveCapture({ album, entries, save, next, menu, spotify, busy })
     <div className="capture-disc" aria-hidden="true" />
     <CaptureLines session={media.session} entries={entries} holding={holding} showGrooves={media.phase !== 'idle'} />
     <div className="live-navigation">
-      <button className="icon-button" aria-label="여행 메뉴" onClick={menu} disabled={locked}><Icon name="list" size={18} /></button>
+      <button className="icon-button" aria-label="선반으로 돌아가기" onClick={home} disabled={locked}><Icon name="list" size={18} /></button>
       {hasPhoto && <button className="icon-button" aria-label="기록 확인" onClick={next} disabled={locked}><Icon name="next" size={22} /></button>}
     </div>
     {spotify && <a className="capture-now-playing" href={spotify.url} target="_blank" rel="noreferrer">

@@ -82,6 +82,13 @@ export function Cover({ album }) {
   </div>;
 }
 
+export function SleeveFace({ album }) {
+  const photo = useMedia(albumArt(album));
+  return <span className="sleeve-face">
+    {photo && <img src={photo} alt="" loading="lazy" draggable={false} />}
+  </span>;
+}
+
 export function PullSleeve({ album, open }) {
   const pointer = useRef(null);
   const [distance, setDistance] = useState(0);

@@ -194,6 +194,7 @@ p,h1,h2,blockquote{margin:0}
 .moment-spotify a{display:inline-block;margin:8px 0;color:var(--muted);font-size:11px;text-underline-offset:3px}
 .focus-bottom{position:relative;z-index:3;text-align:center;padding:5px 24px max(14px,env(safe-area-inset-bottom));background:linear-gradient(transparent,#535d81 17%);overflow:hidden}
 .focus-bottom h1{font-size:clamp(18px,5vw,26px);color:#f1f0ec;text-wrap:balance}
+.focus-spotify{max-width:360px;margin:8px auto 0}
 .focus-track{display:grid;grid-template-columns:39px minmax(0,1fr) 39px;align-items:center;max-width:270px;margin:3px auto 0}
 .focus-track .icon-button{width:39px;height:39px}
 .focus-track-name,.focus-save{display:flex;align-items:center;justify-content:center;gap:7px;background:none;border:none;padding:5px 8px;font-size:12px;min-height:38px;color:#f1f0ec;min-width:0}
@@ -245,11 +246,14 @@ p,h1,h2,blockquote{margin:0}
 .empty-face{display:grid;place-items:center;color:#f0edf4;height:clamp(49px,8.6dvh,76px);position:relative;background:#68739158;clip-path:polygon(0 0,100% 0,95% 100%,5% 100%)}
 .empty-face::after{content:"";position:absolute;inset:0 5%;border:1px dashed #e9e9f17a;transform:perspective(150px) rotateX(-11deg);transform-origin:top;pointer-events:none}
 .sleeve-face{display:block;height:clamp(43px,8.5dvh,76px);clip-path:polygon(0 0,100% 0,95% 100%,5% 100%);background:linear-gradient(168deg,#9c9d9b,#878986);transition:filter .2s}
+.sleeve-face img{display:block;width:100%;height:100%;object-fit:fill}
 .sleeve-1 .sleeve-face{background:linear-gradient(168deg,#939591,#818481)}
 .sleeve-2 .sleeve-face{background:linear-gradient(168deg,#858885,#777a78)}
 .sleeve:hover .sleeve-face,.sleeve[aria-expanded=true] .sleeve-face,.empty-sleeve:hover .empty-face{filter:brightness(1.14)}
 .sleeve[aria-expanded=true] .sleeve-face{height:12px}
-.home-foot{display:flex;justify-content:space-between;margin:23px 9.1% 0;color:#eeeff9a3;font-size:8px;letter-spacing:.2em}
+.home-foot{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:space-between;margin:23px 9.1% 0;color:#eeeff9a3;font-size:8px;letter-spacing:.2em}
+.home-foot-actions{display:flex;gap:15px}
+.home-spotify-error{margin:4px 9.1% 0;font-size:11px}
 .home-foot span{align-self:center}
 .home-foot button{display:flex;align-items:center;gap:5px;min-height:42px;background:none;border:0;padding:0;color:#f5f3ed;font-size:11px}
 .pull-wrap{padding:15px 0 13px;animation:unfold .25s ease both}
