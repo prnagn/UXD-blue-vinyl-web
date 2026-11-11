@@ -106,7 +106,24 @@ function selectedArt(album, art) {
 }
 
 export const albumArt = (album) => selectedArt(album, album?.art);
-export const trackArt = (album, track) => selectedArt(album, track?.art) || (track?.kind === 'photo' ? track : undefined);
+export function trackArt(album, track) {
+  if (!track) return undefined;
+  const explicit = selectedArt(album, track.art);
+  if (explicit || track.kind === 'photo') return explicit || track;
+  const photos = album.entries.filter((entry) => entry.kind === 'photo');
+  if (track.captureId) return photos.find((entry) => entry.captureId === track.captureId);
+  // Older captures paired adjacent entries before captureId was introduced.
+  const at = album.entries.indexOf(track);
+  return photos.filter((entry) => entry.day === track.day && entry.time && entry.time === track.time)
+    .sort((a, b) => Math.abs(album.entries.indexOf(a) - at) - Math.abs(album.entries.indexOf(b) - at))[0];
+}
+
+export function replayTracks(entries) {
+  const audio = entries.filter((entry) => ['audio', 'video'].includes(entry.kind));
+  return entries.filter((entry) => audio.includes(entry) || (entry.kind === 'photo' && entry.spotify &&
+    !audio.some((sound) => entry.captureId ? sound.captureId === entry.captureId : sound.day === entry.day && sound.time === entry.time)))
+    .sort((a, b) => ((a.day || '') + (a.time || '')).localeCompare((b.day || '') + (b.time || '')));
+}
 
 async function encodeMedia({ blob, src }) {
   const response = src && !blob ? await fetch(src) : null;
@@ -143,6 +160,14 @@ export async function importAlbum(file) {
     throw new Error('Blue Vinyl에서 내보낸 앨범 파일을 선택해 주세요.');
   }
   const date = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+  function spotifyTrack(value) {
+    if (!value || !/^[a-zA-Z0-9]{22}$/.test(value.id || '')) return undefined;
+    return {
+      id: value.id, name: clean(value.name, 120), artist: clean(value.artist, 200),
+      url: 'https://open.spotify.com/track/' + value.id,
+      image: typeof value.image === 'string' && /^https:\/\/i\.scdn\.co\/image\/[a-zA-Z0-9]+$/.test(value.image) ? value.image : '',
+    };
+  }
   const entries = await Promise.all(album.entries.map(async (entry) => {
     const { kind, data } = entry;
     if (!['memo', 'photo', 'audio', 'video'].includes(kind)) throw new Error('읽을 수 없는 트랙이 있어요.');
@@ -152,6 +177,10 @@ export async function importAlbum(file) {
       id: crypto.randomUUID(), kind, day: date(entry.day), name: clean(entry.name, 120),
       time: typeof entry.time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(entry.time) ? entry.time : '',
       note: clean(entry.note, 3000), artist: clean(entry.artist, 120), fieldRecording: entry.fieldRecording === true,
+      captureId: typeof entry.captureId === 'string' ? clean(entry.captureId, 80) : undefined,
+      durationMs: Number.isFinite(entry.durationMs) ? Math.max(0, Math.min(300000, entry.durationMs)) : undefined,
+      waveform: Array.isArray(entry.waveform) ? entry.waveform.slice(0, 360).map((value) => Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0) : undefined,
+      spotify: spotifyTrack(entry.spotify),
       blob: type ? await (await fetch(data)).blob() : undefined,
     };
   }));

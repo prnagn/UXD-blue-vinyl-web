@@ -7,7 +7,9 @@ import { BlankRecord, TripDetails } from './trip-details';
 import { HomeTurntable } from './home-turntable';
 import { JourneyConfirm, PressCompleted, PressRecord } from './press-record';
 import { ReturnMail, ShippingScreen } from './shipping';
-import { SongForm, TripMoment } from './trip-moment';
+import { TripMoment } from './trip-moment';
+import { LiveCapture } from './live-capture';
+import { useSpotify } from './spotify';
 import { Inbox } from './inbox';
 import { Arm, Icon, Plane, PullSleeve, Top, Vinyl, albumTitle, dateLabel, entryIcons, useMedia } from './ui';
 import { Recorder, TrackMedia } from './recorder';
@@ -48,6 +50,8 @@ function App() {
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const main = useRef(null);
+  const resumedSpotify = useRef('');
+  const spotify = useSpotify(page === 'trip' || page === 'moment-summary');
 
   useEffect(() => {
     let active = true;
@@ -142,6 +146,13 @@ function App() {
     setPage(next);
   }, []);
   const showShipping = useCallback(() => go('shipping'), [go]);
+  useEffect(() => {
+    if (!loaded || !spotify.resumeAlbumId || resumedSpotify.current === spotify.resumeAlbumId) return;
+    resumedSpotify.current = spotify.resumeAlbumId;
+    if (!records.some((item) => item.id === spotify.resumeAlbumId && item.phase === 'trip')) return;
+    setId(spotify.resumeAlbumId);
+    go('trip');
+  }, [loaded, spotify.resumeAlbumId, records, go]);
 
   function openAlbum(item) {
     setPreviewDelivery(null);
@@ -194,7 +205,22 @@ function App() {
   async function addEntry(entry) {
     const now = new Date();
     const next = { id: crypto.randomUUID(), ...entry, day: localDay(now), time: entry.time || localTime(now) };
-    if (await persist({ ...album, entries: [...album.entries, next] }, 'trip')) setTrackId(next.id);
+    if (await persist({ ...album, entries: [...album.entries, next] }, 'moment-summary')) setTrackId(next.id);
+  }
+
+  async function saveLiveCapture(capture) {
+    if (!Object.hasOwn(capture, 'confirmedSpotify')) capture.confirmedSpotify = await spotify.captureTrack();
+    const stamp = { day: localDay(capture.at), time: localTime(capture.at), captureId: crypto.randomUUID(), spotify: capture.confirmedSpotify || undefined };
+    const photoId = capture.photo ? crypto.randomUUID() : undefined;
+    const entries = [];
+    if (capture.photo) entries.push({ ...stamp, id: photoId, kind: 'photo', name: '여행의 순간', blob: capture.photo });
+    if (capture.audio) entries.push({
+      ...stamp, id: crypto.randomUUID(), kind: 'audio', name: '현장의 소리', fieldRecording: true,
+      blob: capture.audio, durationMs: capture.durationMs, waveform: capture.waveform,
+      art: photoId ? { trackId: photoId } : undefined,
+    });
+    if (!entries.length) return true;
+    return persist({ ...album, entries: [...album.entries, ...entries] });
   }
 
   async function pressMoment() {
@@ -222,14 +248,6 @@ function App() {
     }
   }
 
-  function saveSong(song) {
-    if (!song.blob.type.startsWith('audio/') || song.blob.size > 35 * 1024 * 1024) {
-      setNotice('35MB 이하의 오디오 파일을 선택해 주세요.');
-      return;
-    }
-    addEntry({ ...song, kind: 'audio' });
-  }
-
   function attach(event, fieldRecording = false) {
     const file = event.target.files[0];
     event.target.value = '';
@@ -241,7 +259,7 @@ function App() {
   }
 
   function review() {
-    setReviewFrom(page === 'draft-disc' ? 'draft-disc' : 'trip');
+    setReviewFrom(page);
     const hasToday = orderedEntries.some((entry) => entry.day === today);
     setReviewDay(page === 'draft-disc' && !hasToday ? album.grooves?.at(-1)?.day || today : today);
     setTrackId('');
@@ -436,10 +454,13 @@ function App() {
         {page === 'create' && <TripDetails form={form} update={(patch) => setForm((value) => ({ ...value, ...patch }))}
           save={createTrip} busy={busy} back={() => go(editingDetails ? 'draft-disc' : 'blank')} />}
 
-        {page === 'trip' && album && <TripMoment album={album} entries={orderedEntries.filter((entry) => entry.day === today)}
+        {page === 'trip' && album && <LiveCapture album={album} entries={orderedEntries.filter((entry) => entry.day === today)}
+          save={saveLiveCapture} next={() => go('moment-summary')} menu={() => setSheet('trip-menu')}
+          spotify={spotify.track} busy={busy} />}
+        {page === 'moment-summary' && album && <TripMoment album={album} entries={orderedEntries.filter((entry) => entry.day === today)}
           day={today}
           note={momentNote} setNote={setMomentNote} menu={() => setSheet('trip-menu')}
-          attach={attach} add={() => setSheet('song')} press={pressMoment} busy={busy} />}
+          capture={() => go('trip')} press={pressMoment} busy={busy} />}
 
         {page === 'record' && album && <>
           <Top title="FIELD RECORDING" back={() => go('trip')} />
@@ -449,7 +470,7 @@ function App() {
             onFile={(event) => attach(event, true)} />
         </>}
 
-        {page === 'play' && album && <AlbumPlayer key={album.id} album={album} art={track ? chosenArt : cover}
+        {page === 'play' && album && <AlbumPlayer key={album.id} album={album}
           tracks={tracks} track={track} onTrack={playTrack} back={returnFromPlayer} busy={busy} autoStart={Boolean(previewDelivery)}
           send={previewDelivery ? undefined : () => { setNotice(''); go('send-lp'); }}
           save={previewDelivery ? () => finishDelivery(previewDelivery, true) : undefined} />}
@@ -459,7 +480,7 @@ function App() {
 
         {page === 'review' && album && <>
           <Top title="TODAY’S TRACK" back={returnFromPlayer} action={() => setSheet('edit')} actionIcon="edit" actionLabel="트랙 편집" />
-          <div className="player-art"><Vinyl color={album.color} image={cover} playing={playing} /><Arm /></div>
+          <div className="player-art"><Vinyl color={album.color} image={chosenArt} playing={playing} /><Arm /></div>
           <section className="content player-content">
             <p className="eyebrow">DAILY REPLAY</p>
             <h1>오늘의 트랙 감상</h1>
@@ -495,14 +516,12 @@ function App() {
         discard={(delivery) => finishDelivery(delivery, false)} busy={busy} notice={notice} />}
       {sheet === 'finish-journey' && <JourneyConfirm confirm={confirmJourney} close={() => setSheet('')} />}
       {sheet && sheet !== 'inbox' && sheet !== 'finish-journey' && <Sheet key={sheet} close={() => setSheet('')} title={{
-        add: '트랙 추가', song: '들은 노래 기록', memo: editId ? '메모 편집' : '여행 메모',
+        add: '트랙 추가', memo: editId ? '메모 편집' : '여행 메모',
         edit: '트랙 편집', art: artTrack ? '트랙 사진 선택' : 'LP 커버 선택', 'trip-menu': '여행 메뉴', 'draft-menu': 'LP 메뉴',
       }[sheet]}>
         {sheet === 'art' && album && <ArtPicker album={album} track={artTrack} choose={saveArt} upload={uploadArt} busy={busy} />}
-        {sheet === 'song' && <SongForm day={today} save={saveSong} busy={busy} />}
         {sheet === 'add' && <>
           <label className="sheet-row file-label"><Icon name="camera" /> 사진 추가<input type="file" accept="image/*" onChange={attach} /></label>
-          <button className="sheet-row" onClick={() => setSheet('song')}><Icon name="audio" /> 들은 노래 기록</button>
           <label className="sheet-row file-label"><Icon name="video" /> 영상 추가<input type="file" accept="video/*" onChange={attach} /></label>
           <button className="sheet-row" onClick={() => openMemo()}><Icon name="memo" /> 메모 추가</button>
         </>}
@@ -522,6 +541,12 @@ function App() {
           </div>)}
         </>}
         {sheet === 'trip-menu' && <>
+          {page === 'moment-summary' && <button className="sheet-row" onClick={() => go('trip')}><Icon name="camera" /> 다시 촬영</button>}
+          {page === 'trip' && orderedEntries.some((entry) => entry.day === today) && <button className="sheet-row" onClick={() => go('moment-summary')}><Icon name="next" /> 기록 확인</button>}
+          <button className="sheet-row" disabled={spotify.connecting} onClick={() => spotify.connected ? spotify.disconnect() : spotify.connect(album.id)}>
+            <Icon name="audio" /> {spotify.connected ? 'Spotify 연결 해제' : 'Spotify 연결'}
+          </button>
+          {spotify.error && <p className="error" role="status">{spotify.error}</p>}
           <button className="sheet-row" onClick={() => setSheet('add')}><Icon name="plus" /> 트랙 추가</button>
           <button className="sheet-row" onClick={() => go('record')}><Icon name="mic" /> 현장 녹음</button>
           <button className="sheet-row" onClick={review}><Icon name="play" /> 오늘의 트랙 감상</button>

@@ -92,7 +92,7 @@ export function HomeTurntable({ album, open, children }) {
 
   return <section className="turntable" aria-label="Blue Vinyl">
     <button className="latest-disc" onClick={open} aria-label={'최근 LP · ' + title}>
-      <Vinyl color="#d9d9d7" image={art} playing={playing} />
+      <Vinyl color="#d9d9d7" image={art} playing />
     </button>
     <button className={'home-arm' + (dragAngle !== null ? ' dragging' : '')}
       style={{ '--arm-angle': angle + 'deg' }}
