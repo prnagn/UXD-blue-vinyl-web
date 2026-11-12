@@ -187,6 +187,9 @@ try {
   const { Inbox } = await server.ssrLoadModule('/src/inbox.jsx');
   const incomingView = renderToStaticMarkup(React.createElement(Inbox, { items: [welcome], index: 0 }));
   assert(incomingView.includes('Paris, France') && incomingView.includes('지금 재생') && incomingView.includes('선반에 추가') && incomingView.includes('버리기'));
+  assert(incomingView.includes('--letter-duration:2000ms') && incomingView.includes('letter-right-fold'));
+  assert.equal((incomingView.match(/letter-bottom-fold/g) || []).length, 2, 'the sheet must unfold as four paper panels');
+  assert(incomingView.includes('aria-busy="true"'), 'actions must wait until the two-second opening finishes');
   assert(!incomingView.includes('근처') && !incomingView.includes('@'), 'the incoming view must not add sender or distance metadata');
   const { SharedTag } = await server.ssrLoadModule('/src/ui.jsx');
   assert(renderToStaticMarkup(React.createElement(SharedTag)).includes('SHARED'));

@@ -517,7 +517,7 @@ button.shipping-location{min-height:30px;border:0;background:none;text-decoratio
 .sheet{background:#3c4564;border:1px solid #ffffff29;border-bottom:0;border-radius:21px 21px 0 0;padding:10px 19px max(22px,env(safe-area-inset-bottom));display:grid;gap:12px;box-shadow:0 -10px 42px #11132563}
 .sheet header{display:flex;justify-content:space-between;align-items:center}
 .inbox-dialog{width:min(calc(var(--app-width) - 26px),340px);max-width:100%;max-height:calc(100dvh - 28px);padding:34px 8px 10px;border:0;color:inherit;background:transparent}
-.inbox-dialog::backdrop{background:#10132488}
+.inbox-dialog::backdrop{background:#1013249c;backdrop-filter:blur(6px)}
 .delivery-close{position:absolute;right:1px;top:0}
 .delivery-stage{position:relative;display:grid;place-items:center;padding:17px 0 7px;overflow:hidden}
 .delivery-envelope{width:82%;max-width:252px;aspect-ratio:1;position:relative;border-radius:10px;background:linear-gradient(142deg,#f5f0e5,#e7ded0);box-shadow:0 12px 25px #11162860;animation:delivery-open .48s .32s ease-out both}
