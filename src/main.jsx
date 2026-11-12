@@ -1,6 +1,6 @@
 import React, { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { addDelivery, albumArt, albumFile, deliverySchedule, ensureWelcomeDelivery, importAlbum, loadAlbums, loadInbox, localDay, localTime, resetArchive, resolveDelivery, saveAlbum, trackArt, visibleShelfAlbums } from './archive';
+import { addDelivery, albumArt, albumFile, completeWelcomePreview, deliverySchedule, ensureWelcomeDelivery, importAlbum, loadAlbums, loadInbox, localDay, localTime, resetArchive, resolveDelivery, saveAlbum, trackArt, visibleShelfAlbums, welcomePreviewRequired } from './archive';
 import { AlbumPlayer } from './album-player';
 import { ArtPicker } from './art-picker';
 import { BlankRecord, TripDetails } from './trip-details';
@@ -46,6 +46,7 @@ function App() {
   const [preview, setPreview] = useState('');
   const [inbox, setInbox] = useState([]);
   const [inboxIndex, setInboxIndex] = useState(0);
+  const [welcomeRequired, setWelcomeRequired] = useState(false);
   const [previewDelivery, setPreviewDelivery] = useState(null);
   const [shareLink, setShareLink] = useState('');
   const [reviewDay, setReviewDay] = useState(localDay);
@@ -77,8 +78,8 @@ function App() {
     async function refreshInbox() {
       try {
         await ensureWelcomeDelivery();
-        const items = await loadInbox();
-        if (active) setInbox(items);
+        const [items, required] = await Promise.all([loadInbox(), welcomePreviewRequired()]);
+        if (active) { setInbox(items); setWelcomeRequired(required); }
       } catch {
         if (active) setNotice('받은 LP를 불러오지 못했어요.');
       }
@@ -399,6 +400,7 @@ function App() {
   }
 
   async function finishDelivery(delivery, keep) {
+    if (welcomeRequired && delivery.id === 'welcome-paris') return;
     if (saving.current || busy) return;
     saving.current = true;
     setBusy(true);
@@ -444,11 +446,18 @@ function App() {
 
   const goHome = () => { setPreview(''); setPreviewDelivery(null); go('home'); };
   const latest = shelfAlbums.find((item) => item.phase === 'pressed' && availableOnTurntable(item, today));
+  const homeDelivery = (welcomeRequired && inbox.find(item => item.id === 'welcome-paris')) || inbox[0];
   const returnFromPlayer = () => {
     if (previewDelivery) {
+      const returnedId = previewDelivery.id;
+      if (welcomeRequired && returnedId === 'welcome-paris') {
+        setWelcomeRequired(false);
+        completeWelcomePreview().catch(() => setNotice('첫 재생 안내를 완료한 상태를 저장하지 못했어요.'));
+      }
       setPreviewDelivery(null);
       go('home');
-      if (inbox.length) setSheet('inbox');
+      const index = inbox.findIndex(item => item.id === returnedId);
+      if (index >= 0) { setInboxIndex(index); setSheet('inbox'); }
     } else go(page === 'review' ? reviewFrom : 'home');
   };
 
@@ -460,6 +469,7 @@ function App() {
       await resetArchive(() => setNotice('다른 Blue Vinyl 창을 닫으면 초기화를 완료합니다.'));
       await ensureWelcomeDelivery();
       const freshInbox = await loadInbox();
+      setWelcomeRequired(await welcomePreviewRequired());
       setRecords([]); setInbox(freshInbox); setId(''); setMomentNote(''); setTrackId('');
       setPreview(''); setPreviewDelivery(null); setShareLink('');
       go('home');
@@ -474,7 +484,7 @@ function App() {
       <Boot>
       <main className={'screen ' + page} ref={main}>
         {page === 'home' && <HomeScene albums={shelfAlbums} latest={latest} openAlbum={openAlbum}
-          delivery={inbox[0]} inboxOpen={sheet === 'inbox'} openInbox={() => { setInboxIndex(0); setSheet('inbox'); }}
+          delivery={homeDelivery} guided={welcomeRequired} inboxOpen={sheet === 'inbox'} openInbox={() => { setInboxIndex(Math.max(0, inbox.indexOf(homeDelivery))); setSheet('inbox'); }}
           preview={preview} setPreview={setPreview} today={today} unpack={unpackAlbum} busy={busy} loaded={loaded}
           create={() => { setForm(newTrip()); setEditingDetails(false); go('blank'); }}
           settings={() => { setNotice(''); setSheet('settings'); }} error={spotify.error} />}
@@ -506,7 +516,7 @@ function App() {
         {page === 'play' && album && <AlbumPlayer key={album.id} album={album}
           tracks={tracks} track={track} selectedId={trackId} onTrack={playTrack} back={returnFromPlayer} busy={busy} autoStart={Boolean(previewDelivery)}
           send={previewDelivery ? undefined : () => { setNotice(''); go('send-lp'); }}
-          save={previewDelivery ? () => finishDelivery(previewDelivery, true) : undefined} />}
+          save={previewDelivery && !(welcomeRequired && previewDelivery.id === 'welcome-paris') ? () => finishDelivery(previewDelivery, true) : undefined} />}
         {page === 'send-lp' && album && <LazyScreen back={() => go('play')}><ReturnMail album={album} back={() => go('play')}
           createLink={['http:', 'https:'].includes(window.location.protocol) ? makeShareLink : undefined}
           shareLink={shareLink} download={downloadAlbum} busy={busy} /></LazyScreen>}
@@ -545,7 +555,8 @@ function App() {
       </main>
       </Boot>
 
-      {sheet === 'inbox' && inbox.length > 0 && <Inbox items={inbox} index={inboxIndex} onIndex={setInboxIndex} close={() => setSheet('')}
+      {(sheet === 'inbox' || previewDelivery) && inbox.length > 0 && <Inbox items={inbox} index={inboxIndex} onIndex={setInboxIndex}
+        active={sheet === 'inbox'} guided={welcomeRequired} close={() => setSheet('')}
         play={playDelivery} save={(delivery) => finishDelivery(delivery, true)}
         discard={(delivery) => finishDelivery(delivery, false)} busy={busy} notice={notice} />}
       {sheet === 'finish-journey' && <JourneyConfirm confirm={confirmJourney} close={() => setSheet('')} />}

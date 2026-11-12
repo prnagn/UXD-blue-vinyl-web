@@ -1,54 +1,71 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useCaptureSession } from './capture-session';
 import { Icon, useMedia } from './ui';
 
 function CaptureLines({ session, entries, holding, showGrooves }) {
   const canvas = useRef(null);
-  const current = useRef({ entries, holding, showGrooves });
-  current.current = { entries, holding, showGrooves };
+  const wake = useRef(null);
+  const groups = useMemo(() => entries.filter(entry => entry.fieldRecording && entry.waveform?.length)
+    .map(entry => ({ values: entry.waveform, duration: entry.durationMs })), [entries]);
+  const current = useRef(null);
+  current.current = { groups, holding, showGrooves };
 
   useEffect(() => {
     const element = canvas.current;
     const ctx = element.getContext('2d');
-    let frame;
+    let frame = null;
     let lastSample = 0;
+    let lastPaint = -Infinity;
     const bytes = new Uint8Array(256);
     let width = 0;
     let height = 0;
-    const resize = new ResizeObserver(([item]) => {
-      width = item.contentRect.width;
-      height = item.contentRect.height;
+    let seam = { x: 0, y: 0 };
+    let radius = 0;
+    let centerY = 0;
+    const button = element.parentElement.querySelector('.live-record');
+    function schedule() {
+      if (frame === null && !document.hidden) frame = requestAnimationFrame(draw);
+    }
+    function measure() {
+      width = element.clientWidth;
+      height = element.clientHeight;
       const ratio = Math.min(devicePixelRatio || 1, 2);
       element.width = width * ratio;
       element.height = height * ratio;
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    });
+      const control = button.getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
+      seam = { x: control.x + control.width / 2 - bounds.x, y: control.y + control.height / 2 - bounds.y };
+      radius = Math.max(width * 1.05, (height - 45) / 2) - 28;
+      centerY = seam.y - radius;
+      element.parentElement.style.setProperty('--capture-center-y', centerY + 'px');
+      element.parentElement.style.setProperty('--capture-diameter', (radius + 28) * 2 + 'px');
+      schedule();
+    }
+    const resize = new ResizeObserver(measure);
     resize.observe(element);
+    resize.observe(button);
 
     function draw(now) {
+      frame = null;
       const active = session.current;
       const running = current.current.holding;
-      ctx.clearRect(0, 0, width, height);
+      const animating = Boolean(active?.analyser || running);
       bytes.fill(128);
       active?.analyser?.getByteTimeDomainData(bytes);
-      let power = 0;
-      for (const value of bytes) power += ((value - 128) / 128) ** 2;
-      const level = Math.min(1, Math.sqrt(power / bytes.length) * 4);
       if (running && active && !active.released && now - lastSample > 50) {
+        let power = 0;
+        for (const value of bytes) power += ((value - 128) / 128) ** 2;
+        const level = Math.min(1, Math.sqrt(power / bytes.length) * 4);
         active.levels.push(level);
         lastSample = now;
       }
-
-      const button = element.parentElement.querySelector('.live-record').getBoundingClientRect();
-      const bounds = element.getBoundingClientRect();
-      const seam = { x: button.x + button.width / 2 - bounds.x, y: button.y + button.height / 2 - bounds.y };
-      const radius = Math.max(width * 1.05, (height - 45) / 2) - 28;
-      const centerY = seam.y - radius;
-      element.parentElement.style.setProperty('--capture-center-y', centerY + 'px');
-      element.parentElement.style.setProperty('--capture-diameter', (radius + 28) * 2 + 'px');
+      // Keep microphone sampling responsive, but paint at most 30 times a second.
+      if (animating && now - lastPaint < 1000 / 30) { schedule(); return; }
+      lastPaint = animating && Number.isFinite(lastPaint) ? now - (now - lastPaint) % (1000 / 30) : now;
+      ctx.clearRect(0, 0, width, height);
       if (current.current.showGrooves) {
-        const groups = current.current.entries.filter((entry) => entry.fieldRecording && entry.waveform?.length)
-          .map((entry) => ({ values: entry.waveform, duration: entry.durationMs }));
+        const groups = [...current.current.groups];
         if (active?.levels.length && !active.saved) groups.push({ values: active.levels, duration: (active.released ? active.finished : now) - active.started });
         let cursor = Math.PI / 2;
         ctx.save();
@@ -60,16 +77,14 @@ function CaptureLines({ session, entries, holding, showGrooves }) {
           const r = radius;
           ctx.beginPath();
           ctx.arc(0, 0, r, cursor, cursor + length);
-          ctx.stroke();
-          const stride = Math.max(1, Math.floor(group.values.length / 200));
+          const stride = Math.max(1, Math.ceil(group.values.length / 200));
           for (let i = 0; i < group.values.length; i += stride) {
             const angle = cursor + (1 - i / Math.max(1, group.values.length - 1)) * length;
             const amplitude = 1 + group.values[i] * 16;
-            ctx.beginPath();
             ctx.moveTo(Math.cos(angle) * (r - amplitude), Math.sin(angle) * (r - amplitude));
             ctx.lineTo(Math.cos(angle) * (r + amplitude), Math.sin(angle) * (r + amplitude));
-            ctx.stroke();
           }
+          ctx.stroke();
           cursor += length + 0.19;
         }
         ctx.restore();
@@ -87,11 +102,18 @@ function CaptureLines({ session, entries, holding, showGrooves }) {
         if (!i) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.stroke();
-      frame = requestAnimationFrame(draw);
+      if (animating) schedule();
     }
-    frame = requestAnimationFrame(draw);
-    return () => { resize.disconnect(); cancelAnimationFrame(frame); };
+    function visibility() {
+      if (document.hidden) { cancelAnimationFrame(frame); frame = null; }
+      else schedule();
+    }
+    wake.current = schedule;
+    document.addEventListener('visibilitychange', visibility);
+    measure();
+    return () => { wake.current = null; resize.disconnect(); cancelAnimationFrame(frame); document.removeEventListener('visibilitychange', visibility); };
   }, [session]);
+  useEffect(() => { wake.current?.(); }, [groups, holding, showGrooves]);
   return <canvas className="capture-lines" ref={canvas} aria-hidden="true" />;
 }
 

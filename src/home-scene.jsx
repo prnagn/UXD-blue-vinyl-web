@@ -3,10 +3,10 @@ import { HomeTurntable } from './home-turntable';
 import { FlyingAirmail } from './flying-airmail';
 import { ParcelShelf } from './parcel-shelf';
 import { availableOnTurntable } from './parcel-state';
-import { homeLayout } from './home-layout';
+import { homeLayout, shelfCoverRatio } from './home-layout';
 import { albumTitle, dateLabel, Icon, PullSleeve, SharedTag, SleeveFace } from './ui';
 
-export function HomeScene({ albums, latest, openAlbum, delivery, inboxOpen, openInbox, preview, setPreview,
+export function HomeScene({ albums, latest, openAlbum, delivery, guided, inboxOpen, openInbox, preview, setPreview,
   today, unpack, busy, loaded, create, settings, error }) {
   const root = useRef(null);
   const shelf = useRef(null);
@@ -15,11 +15,13 @@ export function HomeScene({ albums, latest, openAlbum, delivery, inboxOpen, open
   const suppress = useRef(false);
   const suppressTimer = useRef(null);
   const [mode, setMode] = useState('home');
+  const [coverScroll, setCoverScroll] = useState(0);
   const [size, setSize] = useState({ width: 368, height: 799 });
   const selected = albums.findIndex(item => item.id === preview) + 1;
   const view = preview && selected ? 'cover' : mode;
   const slots = [null, ...albums];
-  const positions = homeLayout(slots.length, size.height, view, selected, size.width);
+  const positions = homeLayout(slots.length, size.height, view, selected, size.width)
+    .map(position => view === 'cover' ? { ...position, top: position.top + coverScroll } : position);
 
   useEffect(() => {
     const observer = new ResizeObserver(([entry]) => setSize({ width: entry.contentRect.width, height: entry.contentRect.height }));
@@ -28,7 +30,7 @@ export function HomeScene({ albums, latest, openAlbum, delivery, inboxOpen, open
   }, []);
 
   function switchView(next) {
-    if (performance.now() - switched.current < 650) return false;
+    if (performance.now() - switched.current < 1200) return false;
     switched.current = performance.now();
     setPreview('');
     setMode(next);
@@ -66,7 +68,9 @@ export function HomeScene({ albums, latest, openAlbum, delivery, inboxOpen, open
   }
   function tap(item) {
     if (suppress.current) return;
-    if (view === 'home') { switchView('stack'); return; }
+    switched.current = performance.now();
+    setCoverScroll(shelf.current?.scrollTop || 0);
+    setMode('stack');
     setPreview(preview === item.id ? '' : item.id);
   }
 
@@ -76,16 +80,18 @@ export function HomeScene({ albums, latest, openAlbum, delivery, inboxOpen, open
     <div className="home-turntable-scene" inert={view !== 'home'}>
       <HomeTurntable key={latest?.id || 'empty'} album={latest} active={view === 'home'} open={() => latest && openAlbum(latest)} />
     </div>
-    <FlyingAirmail delivery={delivery} paused={inboxOpen || view !== 'home'} open={openInbox} />
-    <section ref={shelf} className="home-shelf" aria-label="LP 리스트" style={{ '--phone-scale': size.width / 368 }}>
+    <FlyingAirmail delivery={delivery} guided={guided} paused={inboxOpen || view !== 'home'} open={openInbox} />
+    <section ref={shelf} className="home-shelf" aria-label="LP 리스트" style={{ '--phone-scale': size.width / 368, '--shelf-cover-width': shelfCoverRatio * 100 + '%' }}>
       <div className="home-shelf-content" style={{ height: Math.max(size.height - 70, positions.at(-1).top + positions.at(-1).height + 55) }}>
         {slots.map((item, index) => {
           const position = positions[index];
           const expanded = item && preview === item.id;
           return <div key={item?.id || 'add'} className={'home-slab' + (position.up ? ' slab-up' : '') + (expanded ? ' slab-selected' : '')}
-            style={{ top: position.top, '--slab-height': position.height + 'px', '--stagger': (view === 'home' ? slots.length - 1 - index : index) * 38 + 'ms' }}>
+            style={{ transform: `translateY(${position.top}px)`, '--slab-height': position.height + 'px', '--stagger': Math.min(180, (view === 'home' ? slots.length - 1 - index : index) * 38) + 'ms' }}>
             {!item ? <button className="empty-sleeve" disabled={!loaded} onClick={() => { if (!suppress.current) create(); }}>
-              <span className="spine">+ Add New Album</span><span className="empty-face"><Icon name="plus" size={25} /></span>
+              <span className="spine">+ Add New Album</span><span className="empty-face"><Icon name="plus" size={25} />
+                <svg className="empty-outline" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M.3 .5H99.7L96.3 99.5H3.7Z" vectorEffect="non-scaling-stroke" /></svg>
+              </span>
             </button> : !availableOnTurntable(item, today) ? <ParcelShelf album={item} today={today} expanded={expanded}
               toggle={() => tap(item)} unpack={unpack} busy={busy} /> : <>
               <button className="sleeve" aria-expanded={expanded} onClick={() => tap(item)}>

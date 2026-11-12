@@ -3,7 +3,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createServer } from 'vite';
 import { startAmbient } from '../src/ambient-audio.js';
-import { parkedAngle, needleRadius, trackRadius, trackAngle } from '../src/replay-geometry.js';
+import { parkedAngle, needleRadius, trackRadius, trackAngle, replayArmAngle } from '../src/replay-geometry.js';
 import './capture.test.mjs';
 import './spotify-browser.test.mjs';
 import { testSharedAirmail } from './shared-airmail.test.mjs';
@@ -11,7 +11,21 @@ import { playbackDays, dayPosition, trackAtPosition } from '../src/playback-days
 import { centeredScroll, reorderPosition, reorderSpacing } from '../src/carousel-layout.js';
 import { availableOnTurntable, parcelState } from '../src/parcel-state.js';
 import { homeLayout } from '../src/home-layout.js';
-import { airmailFrames } from '../src/airmail-flight.js';
+import { airmailFrames, guidedAirmailFrames } from '../src/airmail-flight.js';
+import { fitBootFrame, snapBootLp } from '../src/boot-layout.js';
+
+for (const [width, height] of [[280, 600], [320, 568], [390, 844], [432, 932], [800, 360]]) {
+  const scale = fitBootFrame(width, height);
+  assert(393 * scale <= width + .001 && 852 * scale <= height + .001, 'the complete launcher, widgets and dock must fit every phone frame');
+  const orbit = guidedAirmailFrames(width, height).map(frame => frame.transform.match(/translate\(([-\d.]+)px,([-\d.]+)px\) rotate\(([-\d.]+)deg\)/).slice(1).map(Number));
+  assert(orbit.every(([x, y]) => x >= 0 && x + width * .19 <= width && y >= 0 && y + width * .19 <= height), 'the highlighted plane must keep flying within reach');
+  assert(Math.max(...orbit.map(([x]) => x)) - Math.min(...orbit.map(([x]) => x)) > width * .5, 'the first plane must travel, rather than only twinkle in place');
+  assert(Math.abs(orbit[0][0] - orbit.at(-1)[0]) < .001 && Math.abs(orbit[0][1] - orbit.at(-1)[1]) < .001 && Math.abs(orbit.at(-1)[2] - orbit[0][2] - 360) < .001, 'the flight loop must join without a position or heading jump');
+}
+assert.deepEqual(snapBootLp(10, 240), { x: -40, y: 240 });
+assert.deepEqual(snapBootLp(200, 340), { x: 353, y: 340 });
+assert.equal(snapBootLp(20, -800).y, 54, 'dragging above the viewport must leave the floating LP reachable');
+assert.equal(snapBootLp(350, 9000).y, 732, 'dragging below the viewport must leave the floating LP reachable');
 
 for (const [width, height] of [[280, 600], [390, 844], [432, 932]]) {
   const home = homeLayout(16, height, 'home', -1, width);
@@ -19,6 +33,13 @@ for (const [width, height] of [[280, 600], [390, 844], [432, 932]]) {
   assert(home[0].top > height * .5 && stack[0].top < height * .1, 'scrolling must move the shelf from beneath the LP to the top');
   assert(stack.every((slot, index) => !index || slot.top > stack[index - 1].top + stack[index - 1].height + 12), 'a long user collection must retain distinct shelf slots');
   assert(stack.some(slot => slot.up) && stack.some(slot => !slot.up), 'shelf faces must change perspective around eye level');
+  for (const selected of [1, 2, 8, 14]) {
+    const cover = homeLayout(16, height, 'cover', selected, width);
+    assert(Math.abs(cover[selected].top + cover[selected].height / 2 - height / 2) < .001, 'opened covers and captions must center in the viewport at every shelf position');
+    const gap = cover[selected + 1].top - cover[selected].top - cover[selected].height;
+    assert(gap >= 24 * width / 368 && gap <= 40 * width / 368, 'opening an album must keep the next shelf close to its caption');
+    assert(cover[selected - 1].top + cover[selected - 1].height + 12 < cover[selected].top, 'the previous album must not overlap the opened cover');
+  }
   for (const direction of [0, .9]) {
     const frames = airmailFrames(width, () => direction);
     const x = frame => Number(frame.transform.match(/translate\(([-\d.]+)px/)[1]);
@@ -84,6 +105,12 @@ for (const width of [280, 390, 432]) {
   for (const count of [1, 3, 12]) {
     let previous = Infinity;
     for (let i = 0; i < count; i++) {
+      const loadingAngle = replayArmAngle({ playing: false, loading: true, index: i, count, layout });
+      const playingAngle = replayArmAngle({ playing: true, loading: false, index: i, count, layout });
+      assert.equal(loadingAngle, playingAngle, 'waiting for a selected track to start must not send the arm to its parked position');
+      assert.notEqual(loadingAngle, parkedAngle);
+      assert.equal(replayArmAngle({ drag: 7, playing: true, loading: false, index: i, count, layout }), 7, 'grabbing the arm must preserve the visible angle');
+      assert.equal(replayArmAngle({ playing: false, loading: false, index: i, count, layout }), parkedAngle, 'an explicit stop must still park the arm');
       const r = needleRadius(trackAngle(i, count, layout), layout);
       assert(Math.abs(r - trackRadius(i, count, layout)) < .001, 'needle must land on its own track ring');
       assert(r < previous, 'later tracks must be further inward');
@@ -146,12 +173,18 @@ try {
     assert(Math.abs(Math.hypot(pin.x - 50, pin.y - 50) - grooveRadius(pin.grooveIndex)) < .00001, 'each photo pin foot must land on its own engraved ring');
   }
   assert.equal(grooveRadius(0), 47, 'the first groove must start at the outside edge');
+  assert(grooveRadius(0) - grooveRadius(1) > .45 && grooveRadius(0) - grooveRadius(1) < .9, 'early recordings need a visibly wider, restrained groove gap');
+  assert.equal(grooveRadius(79), 22, 'a full LP must keep its innermost groove outside the label');
   for (let at = 1; at < 80; at++) assert(grooveRadius(at) < grooveRadius(at - 1), 'later grooves must fill inward');
   const filledPins = engravedPhotos({ ...pinnedAlbum, grooves: [...pinnedAlbum.grooves, { entryIds: [standalone.id] }] });
   assert.deepEqual(filledPins.slice(0, photoPins.length), photoPins, 'adding a groove must not move previous grooves or their photo pins');
   assert.deepEqual(engravedPhotos({ ...album, grooves: [] }), [], 'an empty LP must not show photo pins');
   assert.deepEqual(engravedPhotos({ ...album, grooves: [{ entryIds: ['a2', 'memo'] }] }), [], 'audio-only or memo grooves must not invent a photo');
   const { BlankRecord } = await server.ssrLoadModule('/src/trip-details.jsx');
+  const emptyDraft = renderToStaticMarkup(React.createElement(BlankRecord, { album: { name: 'Journey', city: 'Daejeon', country: 'Korea', entries: [] }, record: () => {}, enter: () => {} }));
+  assert(emptyDraft.includes('Daejeon, Korea') && emptyDraft.includes('0 MOMENTS') && emptyDraft.includes('+ Record a moment'), 'the empty LP must offer a visible recording button with location and count');
+  const countedDraft = renderToStaticMarkup(React.createElement(BlankRecord, { album, record: () => {} }));
+  assert(countedDraft.includes('3 MOMENTS'), 'photos and audio recorded together count as one moment, not two separate files');
   const pinnedDisc = renderToStaticMarkup(React.createElement(BlankRecord, { album: pinnedAlbum, grooveCount: 1, engraving: true }));
   assert(pinnedDisc.includes('src="/one.jpg"') && pinnedDisc.includes('src="/two.jpg"'));
   assert.equal((pinnedDisc.match(/class="draft-photo-pin new-photo-pin"/g) || []).length, 2, 'engraved photos must appear as pins when the groove is cut');
@@ -195,12 +228,12 @@ try {
   const emptyHome = renderToStaticMarkup(React.createElement(HomeTurntable, {}));
   assert(emptyHome.includes('빈 턴테이블') && !emptyHome.includes('turntable-label') && !emptyHome.includes('<audio'), 'hiding all demos must leave a valid empty turntable');
   const { FlyingAirmail } = await server.ssrLoadModule('/src/flying-airmail.jsx');
-  const { welcomeParisDelivery } = await server.ssrLoadModule('/src/archive.js');
-  const welcome = welcomeParisDelivery();
+  const { welcomeDelivery } = await server.ssrLoadModule('/src/archive.js');
+  const welcome = welcomeDelivery();
   const { HomeScene } = await server.ssrLoadModule('/src/home-scene.jsx');
   const homeScene = renderToStaticMarkup(React.createElement(HomeScene, { albums: [], loaded: true, delivery: welcome }));
   assert(homeScene.includes('Add New Album') && homeScene.includes('aria-label="설정"') && homeScene.includes('art/yuna-plane.png'));
-  assert(!homeScene.includes('여행 지도') && !homeScene.includes('Jeju'), 'the home screen must hide map navigation and dummy shelf albums');
+  assert(!homeScene.includes('여행 지도') && !homeScene.includes('class="sleeve"'), 'the home screen must hide map navigation and dummy shelf albums');
   const { default: Boot } = await server.ssrLoadModule('/src/boot.jsx');
   const boot = renderToStaticMarkup(React.createElement(Boot));
   assert(boot.includes('Blue Vinyl 열기') && boot.includes('img/bv-icon.png'), 'entry must use the copied Yuna app icon and launcher');
@@ -208,9 +241,14 @@ try {
   assert(renderToStaticMarkup(React.createElement(FlyingAirmail, { delivery: welcome })).includes('airmail-flight'));
   const { Inbox } = await server.ssrLoadModule('/src/inbox.jsx');
   const incomingView = renderToStaticMarkup(React.createElement(Inbox, { items: [welcome], index: 0 }));
-  assert(incomingView.includes('Paris, France') && incomingView.includes('지금 재생') && incomingView.includes('선반에 추가') && incomingView.includes('버리기'));
+  assert(incomingView.includes('Jeju, Korea') && incomingView.includes('Play now') && incomingView.includes('add to list') && incomingView.includes('discard'));
+  const guidedView = renderToStaticMarkup(React.createElement(Inbox, { items: [welcome], index: 0, guided: true }));
+  assert(guidedView.includes('Play now') && !guidedView.includes('add to list') && !guidedView.includes('discard') && !guidedView.includes('aria-label="닫기"'), 'first-time users must preview before saving or discarding');
+  const guidedPlane = renderToStaticMarkup(React.createElement(FlyingAirmail, { delivery: welcome, guided: true }));
+  assert(guidedPlane.includes('is-guided') && guidedPlane.includes('airmail-sparkles'), 'the first plane must remain discoverable until caught');
   assert(incomingView.includes('--letter-duration:2000ms') && incomingView.includes('letter-right-fold'));
   assert.equal((incomingView.match(/letter-bottom-fold/g) || []).length, 2, 'the sheet must unfold as four paper panels');
+  assert(incomingView.includes('letter-envelope-flap') && incomingView.includes('envelope-left') && incomingView.includes('envelope-right'), 'the opening must include a triangular envelope flap and two hinged sides');
   assert(incomingView.includes('aria-busy="true"'), 'actions must wait until the two-second opening finishes');
   assert(!incomingView.includes('근처') && !incomingView.includes('@'), 'the incoming view must not add sender or distance metadata');
   const { SharedTag } = await server.ssrLoadModule('/src/ui.jsx');
@@ -219,6 +257,9 @@ try {
   assert(home.includes('open.spotify.com/track/' + song.id) && home.includes('Saved Song') && !home.includes('<iframe'), 'home playback must select Spotify without an embedded player');
   assert(!home.includes('<audio'), 'home must never fall back to environmental recordings');
   assert(home.includes('class="vinyl ') && home.includes('<img src="/one.jpg"') && !home.includes('rotating'), 'paused home LP and its photo must remain still until playback starts');
+  assert(home.includes('spin-ready') && first.includes('spin-ready'), 'home and replay LPs must retain their rotation timeline while paused');
+  const { PullSleeve } = await server.ssrLoadModule('/src/ui.jsx');
+  assert(!renderToStaticMarkup(React.createElement(PullSleeve, { album })).includes('spin-ready'), 'pulling the LP from its sleeve must remain independent of its playback rotation');
   const noSongHome = renderToStaticMarkup(React.createElement(HomeTurntable, { album: { ...album, entries: [p2, a2] } }));
   assert(noSongHome.includes('<audio') && !noSongHome.includes('<iframe') && noSongHome.includes('현장의 소리'), 'an album without Spotify must fall back to its saved field recording');
   const silentHome = renderToStaticMarkup(React.createElement(HomeTurntable, { album: { ...album, entries: [p2] } }));

@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { JourneyWheel } from './journey-wheel';
-import { Icon, Top, Vinyl } from './ui';
+import { albumTitle, Icon, Top, Vinyl } from './ui';
 import { DraftPhotoPins, grooveRadius } from './draft-photo-pins';
+import { pendingMoments } from './moment-groups';
 
 export function BlankRecord({ album, back, enter, finish, home, record, grooveCount = 0, engraving = false, entering = false, entered }) {
   const [wheel, setWheel] = useState(false);
   const visibleGrooves = Math.min(grooveCount, 80);
+  const moments = album ? pendingMoments({ ...album, grooves: [] }, album.entries || []).length : 0;
+  const location = album && ([album.city, album.country].filter(Boolean).join(', ') || albumTitle(album));
   return <div className={'blank-record' + (entering ? ' record-entering' : '')}>
     <Top title="" back={back} action={home || (() => setWheel((open) => !open))} actionLabel={home ? '선반으로 돌아가기' : 'LP 휠 메뉴'} />
     <div className="blank-stage" onAnimationEnd={(event) => {
@@ -35,6 +38,13 @@ export function BlankRecord({ album, back, enter, finish, home, record, grooveCo
         </button>
       </div>}
     </div>
+    {record && <>
+      <div className="draft-summary">
+        <button className="draft-location" onClick={enter} aria-label="장소 정보 편집">{location}<Icon name="edit" size={13} /></button>
+        <span aria-live="polite">{moments} {moments === 1 ? 'MOMENT' : 'MOMENTS'}</span>
+      </div>
+      <footer className="draft-actions"><button className="primary" onClick={record}>+ Record a moment</button></footer>
+    </>}
   </div>;
 }
 

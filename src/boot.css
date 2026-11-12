@@ -1,6 +1,7 @@
 /* ===== Blue Vinyl 부팅 (홈 화면 → 스플래시) ===== */
 .bt{position:absolute;inset:0;z-index:999;overflow:hidden;background:#000;font-family:'Inter','Noto Sans KR',sans-serif}
 .bt-home,.bt-splash{position:absolute;inset:0}
+.bt-canvas{position:absolute;left:50%;top:50%;width:393px;height:852px;transform:translate(-50%,-50%) scale(var(--boot-scale,1));transform-origin:center;overflow:hidden}
 .bt-wall{position:absolute;inset:0;background:radial-gradient(90% 40% at 15% 8%,#f9b24e 0%,transparent 70%),radial-gradient(70% 45% at 100% 30%,#ef6a58 0%,transparent 70%),radial-gradient(80% 40% at 0% 62%,#3d6fc9 0%,transparent 70%),radial-gradient(90% 40% at 100% 85%,#c98ad8 0%,transparent 70%),linear-gradient(170deg,#f39a52,#e8738a 45%,#6a63c8 100%)}
 .bt-status{position:absolute;top:0;left:0;right:0;height:54px;padding:18px 34px 0 40px;display:flex;justify-content:space-between;align-items:flex-start;color:#fff;font-size:16px;z-index:2}
 .bt-status b{font-weight:600;letter-spacing:-.2px}
@@ -30,24 +31,22 @@
 .bt-app{display:flex;flex-direction:column;align-items:center;gap:6px;color:#fff;font-size:11px;background:none;border:0;padding:0;cursor:default;font-family:inherit}
 .bt-ic{width:60px;height:60px;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.22)}
 .bt-ic svg{display:block}
-.bt-bv{cursor:pointer;animation:bt-hint 2.4s ease-in-out 1.2s infinite}
+.bt-bv{cursor:pointer;animation:none}
 .bt-ic-bv{padding:0;overflow:hidden;background:none;box-shadow:none}
-@keyframes bt-hint{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 .bt-dots{position:absolute;bottom:122px;left:0;right:0;display:flex;justify-content:center;gap:8px}
 .bt-dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4)}
 .bt-dots i.on{background:#fff}
 .bt-dock{position:absolute;bottom:20px;left:14px;right:14px;height:92px;border-radius:30px;background:rgba(255,255,255,.28);backdrop-filter:blur(18px);display:flex;justify-content:space-around;align-items:center;padding:0 8px}
-.bt-zoom{position:absolute;left:0;top:0;width:60px;height:60px;border-radius:14px;overflow:hidden;background:#f2eee9;
-  left:calc(20px + (100% - 40px)/4*0 + ((100% - 40px)/4 - 60px)/2 + (100% - 40px)/4*0);}
-.bt-opening .bt-bv{visibility:hidden}
-/* 아이콘이 있는 자리(3행 1열 → 실제 위치는 JS 없이 근사)에서 화면 전체로 */
-.bt-zoom{top:calc(70px + 3*102px);left:calc(20px + (100% - 40px)/2 + ((100% - 40px)/4 - 60px)/2);animation:bt-zoom .52s cubic-bezier(.5,0,.2,1) forwards}
+.bt-zoom{position:absolute;left:0;top:0;border-radius:14px;overflow:hidden;background:#f2eee9;transform-origin:0 0;will-change:transform}
+.bt-stage-opening .bt-bv{visibility:hidden}
+/* Expand from the measured icon position using only compositor transforms. */
+.bt-zoom{width:var(--launch-width);height:var(--launch-height);animation:bt-zoom .52s cubic-bezier(.5,0,.2,1) forwards}
 .bt-zoom svg{width:100%;height:100%}
-@keyframes bt-zoom{to{top:0;left:0;width:100%;height:100%;border-radius:0}}
+@keyframes bt-zoom{from{transform:translate(var(--launch-x),var(--launch-y)) scale(1)}to{transform:translate(var(--launch-end-x),var(--launch-end-y)) scale(var(--launch-scale))}}
 
-.bt-splash{background:#fefefe;animation:bt-bg 4.3s ease forwards;display:grid;place-items:center}
+.bt-splash{background:transparent;display:grid;place-items:center}
 @keyframes bt-bg{0%,12%{background:#747fa3}38%,100%{background:#fefefe}}
-.bt-splash{animation:bt-bg 4.3s ease forwards,bt-out .5s ease 3.8s forwards}
+.bt-stage-splash{background:#fefefe;animation:bt-bg 4.3s ease forwards,bt-out .5s ease 3.8s forwards}
 @keyframes bt-out{to{opacity:0}}
 .bt-lock{display:flex;align-items:center;gap:0}
 .bt-disc{opacity:0;transform:scale(.6) rotate(-120deg);animation:bt-disc 1.1s cubic-bezier(.2,.8,.2,1) .7s forwards}
@@ -58,19 +57,25 @@
 @keyframes bt-wtxt{to{opacity:1;transform:none}}
 
 
-.bt-pip{position:absolute;right:-40px;top:330px;width:80px;height:80px;border-radius:50%;border:0;padding:0;cursor:pointer;z-index:4;background:radial-gradient(circle,#6f7ba3 0 100%);box-shadow:0 6px 18px rgba(60,70,120,.35),inset 0 0 0 1px rgba(255,255,255,.18);display:grid;place-items:center;animation:bt-pip-in .6s cubic-bezier(.2,.8,.2,1) .4s backwards}
+.bt-pip{position:absolute;left:0;top:0;width:80px;height:80px;border-radius:50%;border:0;padding:0;cursor:grab;z-index:4;background:radial-gradient(circle,#6f7ba3 0 100%);box-shadow:0 6px 18px rgba(60,70,120,.35),inset 0 0 0 1px rgba(255,255,255,.18);display:grid;place-items:center;touch-action:none;user-select:none;-webkit-touch-callout:none;transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+.bt-pip.dragging{transition:none;cursor:grabbing}
 .bt-pip::before{content:'';position:absolute;inset:7px;border-radius:50%;border:1px solid rgba(255,255,255,.28);box-shadow:inset 0 0 0 5px rgba(255,255,255,0),0 0 0 0 transparent}
 .bt-pip::after{content:'';position:absolute;inset:15px;border-radius:50%;border:1px solid rgba(255,255,255,.2)}
 .bt-pip i{display:block;width:30px;height:30px;border-radius:50%;background:#f4f0e9;position:relative;z-index:1}
 .bt-pip i::after{content:'';display:block;width:6px;height:6px;border-radius:50%;background:#6f7ba3;margin:12px}
 @keyframes bt-pip-in{from{right:-80px}}
 @keyframes bt-pip-hint{0%,100%{right:-40px}50%{right:-33px}}
-.bt-zoom.pip{border-radius:50%;background:#6f7ba3;width:80px;height:80px;top:330px;left:calc(100% - 40px)}
+.bt-zoom.pip{border-radius:50%;background:#6f7ba3}
 
-.bt-splash.short{animation:bt-bg-s 1.5s ease forwards,bt-out .3s ease 1.2s forwards}
+.bt-stage-splash.via-pip{animation:bt-bg-s 1.5s ease forwards,bt-out .3s ease 1.2s forwards}
 @keyframes bt-bg-s{0%{background:#747fa3}35%,100%{background:#fefefe}}
 .bt-splash.short .bt-disc{animation-duration:.7s;animation-delay:.1s}
 .bt-splash.short .bt-word{display:none}
 
 
 .bt-zoom img{width:100%!important;height:100%!important;object-fit:cover}
+@media(prefers-reduced-motion:reduce){
+  .bt-stage-splash{animation:none!important;background:#fefefe}
+  .bt-disc,.bt-word,.bt-word span{animation:none!important;opacity:1;transform:none}
+  .bt-word{max-width:200px}
+}

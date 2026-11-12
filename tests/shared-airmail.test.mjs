@@ -42,15 +42,21 @@ export async function testSharedAirmail(archive) {
     await archive.ensureWelcomeDelivery();
     await archive.ensureWelcomeDelivery();
     const arrivals = await archive.loadInbox();
-    assert.equal(arrivals.length, 1, 'Paris must arrive as exactly one paper airplane');
-    assert.equal(arrivals[0].album.city, 'Paris');
-    assert.equal((await archive.loadAlbums()).length, 0, 'initial shared Paris must not be on the shelf');
+    assert.equal(arrivals.length, 1, 'Jeju must arrive as exactly one paper airplane');
+    assert.equal(arrivals[0].album.city, 'Jeju');
+    assert.equal(await archive.welcomePreviewRequired(), true, 'the first Jeju delivery must guide the user to preview it');
+    await archive.completeWelcomePreview();
+    assert.equal(await archive.welcomePreviewRequired(), false, 'returning from preview unlocks normal choices');
+    await archive.ensureWelcomeDelivery();
+    assert.equal(await archive.welcomePreviewRequired(), false, 'completed guidance must stay completed when the app reloads');
+    assert.equal((await archive.loadInbox()).length, 1, 'completing guidance must not save or discard the Jeju delivery');
+    assert.equal((await archive.loadAlbums()).length, 0, 'initial shared Jeju must not be on the shelf');
     await archive.saveAlbum({ id: 'own', start: '2026-11-12', entries: [], phase: 'trip' });
     await archive.saveAlbum(archive.demos[0]);
     const kept = await archive.resolveDelivery(arrivals[0], true);
     assert(kept.shared && !kept.demo, 'kept incoming LPs must persist the shared tag');
     await archive.ensureWelcomeDelivery();
-    assert.equal((await archive.loadInbox()).length, 0, 'saving Paris must remove its airplane across reloads');
+    assert.equal((await archive.loadInbox()).length, 0, 'saving Jeju must remove its airplane across reloads');
     const saved = await archive.loadAlbums();
     const shelf = archive.visibleShelfAlbums(saved);
     assert.equal(saved.length, 3, 'hiding demo records must not delete any stored album');
@@ -65,14 +71,25 @@ export async function testSharedAirmail(archive) {
     await archive.resetArchive();
     await archive.ensureWelcomeDelivery();
     const again = await archive.loadInbox();
+    assert.equal(await archive.welcomePreviewRequired(), true, 'formatting should reset the first-delivery guidance with the welcome offer');
     await archive.resolveDelivery(again[0], false);
     await archive.ensureWelcomeDelivery();
-    assert.equal((await archive.loadInbox()).length, 0, 'discarded shared Paris must not reappear');
+    assert.equal((await archive.loadInbox()).length, 0, 'discarded shared Jeju must not reappear');
     assert.equal((await archive.loadAlbums()).length, 0, 'discarding must not add a shelf item');
+    assert.equal(await archive.welcomePreviewRequired(), false, 'an absent delivery must never trigger a phantom highlighted plane');
+    const oldParis = { ...archive.demos[3], id: 'shared-paris', demo: false, shared: true };
+    await archive.saveAlbum(oldParis);
+    await archive.addDelivery({ id: 'welcome-paris', receivedAt: 123, album: oldParis });
+    await archive.ensureWelcomeDelivery();
+    const migrated = await archive.loadInbox();
+    assert.equal(migrated.length, 1, 'upgrading the welcome LP must not create a second incoming plane');
+    assert.equal(migrated[0].album.city, 'Jeju');
+    assert.equal(migrated[0].receivedAt, 123);
+    assert.equal((await archive.loadAlbums()).find(item => item.id === 'shared-paris').city, 'Paris', 'changing the incoming example must preserve the Paris LP already saved by the user');
   } finally {
     await archive.resetArchive();
     if (previous === undefined) delete globalThis.indexedDB;
     else globalThis.indexedDB = previous;
   }
-  console.log('PASS: one-time Paris airmail, persistent save/discard, shared labels, hidden demos and first shelf position');
+  console.log('PASS: one-time Jeju airmail, persistent save/discard, shared labels, hidden demos and first shelf position');
 }

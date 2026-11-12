@@ -88,6 +88,7 @@ export function HomeTurntable({ album, open, children, active = true }) {
   return <><section className="turntable" aria-label="Blue Vinyl">
     <button className="latest-disc" onClick={open} disabled={!album} aria-label={album ? '최근 LP · ' + title : '빈 턴테이블'}>
       <Vinyl
+        rotatable
         color="#d9d9d7"
         image={art}
         playing={playing && angle >= playBoundary}

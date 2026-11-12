@@ -1,6 +1,12 @@
 export const parkedAngle = -35;
 const radians = (angle) => angle * Math.PI / 180;
 
+export function replayArmAngle({ drag, playing, loading, index, count, layout }) {
+  if (drag !== null && drag !== undefined) return drag;
+  if (!(playing || loading) || !count) return parkedAngle;
+  return layout ? trackAngle(index, count, layout) : -10 + index / Math.max(1, count - 1) * 28;
+}
+
 export function needlePosition(angle, layout) {
   const a = radians(angle);
   const x = -71 * layout.scale;

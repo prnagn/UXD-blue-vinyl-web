@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { albumTitle } from './ui';
-import { airmailFrames } from './airmail-flight';
+import { airmailFrames, guidedAirmailFrames } from './airmail-flight';
 
-export function FlyingAirmail({ delivery, open, paused = false }) {
+export function FlyingAirmail({ delivery, open, paused = false, guided = false }) {
   const zone = useRef(null);
   const plane = useRef(null);
   const flight = useRef(null);
   const [flying, setFlying] = useState(false);
   useEffect(() => {
+    setFlying(false);
     if (!delivery) return;
     let timer;
     let animation;
@@ -24,8 +25,10 @@ export function FlyingAirmail({ delivery, open, paused = false }) {
       timer = null;
       if (disposed || stops.size || !plane.current || !zone.current) return;
       setFlying(true);
-      animation = plane.current.animate(airmailFrames(zone.current.clientWidth), { duration: 7200, easing: 'linear' });
-      animation.onfinish = () => {
+      const area = zone.current;
+      animation = plane.current.animate(guided ? guidedAirmailFrames(area.clientWidth, area.clientHeight) : airmailFrames(area.clientWidth),
+        { duration: guided ? 18000 : 7200, easing: 'linear', iterations: guided ? Infinity : 1 });
+      if (!guided) animation.onfinish = () => {
         animation = null;
         setFlying(false);
         schedule(9000 + Math.random() * 7000);
@@ -41,14 +44,14 @@ export function FlyingAirmail({ delivery, open, paused = false }) {
         stops.delete(reason);
         if (!stops.size) {
           if (animation) animation.play();
-          else schedule(1500);
+          else schedule(guided ? 0 : 1500);
         }
       }
     }
     flight.current = stop;
     const visibility = () => stop('hidden', document.hidden);
     document.addEventListener('visibilitychange', visibility);
-    schedule(1500);
+    schedule(guided ? 0 : 1500);
     return () => {
       disposed = true;
       clearTimeout(timer);
@@ -56,15 +59,16 @@ export function FlyingAirmail({ delivery, open, paused = false }) {
       flight.current = null;
       document.removeEventListener('visibilitychange', visibility);
     };
-  }, [delivery?.id]);
+  }, [delivery?.id, guided]);
   useEffect(() => { flight.current?.('dialog', paused); }, [paused]);
   if (!delivery) return null;
   return <div className="airmail-flight-zone" ref={zone}>
-    <button type="button" ref={plane} className={'airmail-flight' + (flying ? ' is-flying' : '')}
+    <button type="button" ref={plane} className={'airmail-flight' + (flying ? ' is-flying' : '') + (guided ? ' is-guided' : '')}
       aria-label={albumTitle(delivery.album) + ' · 받은 LP 열기'} onClick={open}
       onPointerEnter={() => flight.current?.('hover', true)} onPointerLeave={() => flight.current?.('hover', false)}
       onFocus={() => flight.current?.('focus', true)} onBlur={() => flight.current?.('focus', false)}>
       <img src={import.meta.env.BASE_URL + 'art/yuna-plane.png'} alt="" draggable={false} />
+      {guided && <span className="airmail-sparkles" aria-hidden="true"><i /><i /><i /></span>}
     </button>
   </div>;
 }

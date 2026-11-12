@@ -85,10 +85,20 @@ export async function loadInbox() {
   return items.filter((item) => item.album).sort((a, b) => b.receivedAt - a.receivedAt);
 }
 
-export function welcomeParisDelivery() {
-  const source = demos.find((album) => album.city === 'Paris');
+export async function welcomePreviewRequired() {
+  const items = await readStore('inbox');
+  return items.some(item => item.id === 'welcome-paris') && !items.some(item => item.id === 'welcome-paris-previewed');
+}
+
+export const completeWelcomePreview = () => writeStores(['inbox'], tx => {
+  tx.objectStore('inbox').put({ id: 'welcome-paris-previewed', completedAt: Date.now() });
+});
+
+export function welcomeDelivery() {
+  const source = demos.find((album) => album.city === 'Jeju');
+  // Keep the offer's storage key stable so changing the example never revives a consumed offer.
   return { id: 'welcome-paris', receivedAt: 0, album: {
-    ...source, id: 'shared-paris', demo: false, shared: true,
+    ...source, id: 'shared-jeju', demo: false, shared: true,
     entries: source.entries.map((entry) => ({ ...entry })),
   } };
 }
@@ -97,13 +107,19 @@ export function welcomeParisDelivery() {
 // after it has been saved or discarded. Resetting the archive resets the offer.
 export async function ensureWelcomeDelivery() {
   const db = await openArchive();
-  const welcome = welcomeParisDelivery();
+  const welcome = welcomeDelivery();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(['albums', 'inbox'], 'readwrite');
     const inbox = tx.objectStore('inbox');
     const marker = inbox.get('welcome-paris-seeded');
     marker.onsuccess = () => {
-      if (marker.result) return;
+      if (marker.result) {
+        const pending = inbox.get(welcome.id);
+        pending.onsuccess = () => {
+          if (pending.result?.album?.id === 'shared-paris') inbox.put({ ...welcome, receivedAt: pending.result.receivedAt });
+        };
+        return;
+      }
       const existing = tx.objectStore('albums').get(welcome.album.id);
       existing.onsuccess = () => {
         inbox.put({ id: 'welcome-paris-seeded', seeded: true });

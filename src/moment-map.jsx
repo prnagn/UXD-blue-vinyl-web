@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { replayTracks, trackArt } from './archive';
 import { albumTitle, Icon, Top, useMedia } from './ui';
 import { MomentPlayback } from './moment-playback';
@@ -6,7 +6,7 @@ import { MomentPlayback } from './moment-playback';
 const pins = [[64, 36], [54, 56], [79, 75]];
 const momentTime = (entry) => [entry.day?.replaceAll('-', '.'), entry.time].filter(Boolean).join(' · ') || '시간 미기록';
 
-export function MomentMap({ album, tracks, back }) {
+export function MomentMap({ album, tracks, back, active = true }) {
   const [group, setGroup] = useState(0);
   const [id, setId] = useState('');
   const [playing, setPlaying] = useState(false);
@@ -15,6 +15,7 @@ export function MomentMap({ album, tracks, back }) {
   const selected = moments.find((entry) => entry.id === id);
   const photo = useMedia(trackArt(album, selected));
   const pageCount = Math.ceil(moments.length / pins.length);
+  useEffect(() => { if (!active) { setId(''); setPlaying(false); } }, [active]);
 
   function select(entry) {
     setPlaying(false);

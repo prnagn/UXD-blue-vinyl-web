@@ -40,8 +40,8 @@ export function Plane() {
   </svg>;
 }
 
-export function Vinyl({ className = '', color, image, playing }) {
-  return <div className={'vinyl ' + className + (playing ? ' rotating' : '')} aria-hidden="true">
+export function Vinyl({ className = '', color, image, playing, rotatable = false }) {
+  return <div className={'vinyl ' + (rotatable ? 'spin-ready ' : '') + className + (playing ? ' rotating' : '')} aria-hidden="true">
     <div className="vinyl-label" style={{ backgroundColor: color }}>
       {image && <img src={image} alt="" />}
     </div>

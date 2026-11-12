@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { parkedAngle as parked, needleRadius as distance, trackRadius as radius, trackAngle } from './replay-geometry';
+import { parkedAngle as parked, needleRadius as distance, trackRadius as radius, replayArmAngle } from './replay-geometry';
 
-export function ReplayArm({ playing, tracks, track, choose, toggle, stop, stage, view }) {
+export function ReplayArm({ playing, loading = false, tracks, track, choose, toggle, stop, stage, view }) {
   const arm = useRef(null);
   const pointer = useRef(null);
   const [drag, setDrag] = useState(null);
@@ -30,11 +30,16 @@ export function ReplayArm({ playing, tracks, track, choose, toggle, stop, stage,
     if (record) observer.observe(record);
     if (arm.current) observer.observe(arm.current);
     setLayout(measure());
-    return () => observer.disconnect();
+    const element = stage.current;
+    const settled = event => {
+      if (event.propertyName === 'transform' && event.target.matches('.focus-record,.focus-arm-mount')) setLayout(measure());
+    };
+    element?.addEventListener('transitionend', settled);
+    return () => { observer.disconnect(); element?.removeEventListener('transitionend', settled); };
   }, [stage, view]);
 
   // The same physical needle position selects the ring and positions the arm.
-  const angle = drag ?? (playing ? (layout ? trackAngle(index, tracks.length, layout) : -10 + index / Math.max(1, tracks.length - 1) * 28) : parked);
+  const angle = replayArmAngle({ drag, playing, loading, index, count: tracks.length, layout });
   function point(event, active) {
     const delta = Math.atan2(event.clientY - active.layout.y, event.clientX - active.layout.x) - active.start;
     const degrees = Math.atan2(Math.sin(delta), Math.cos(delta)) * 180 / Math.PI;
@@ -57,7 +62,7 @@ export function ReplayArm({ playing, tracks, track, choose, toggle, stop, stage,
     choose(tracks[closest], true);
   }
 
-  return <button className={'focus-arm' + (drag !== null ? ' dragging' : '')} ref={arm}
+  return <div className="focus-arm-mount"><button className={'focus-arm' + (drag !== null ? ' dragging' : '')} ref={arm}
     style={{ '--focus-arm-angle': angle + 'deg' }} aria-label="톤암 · 재생 및 트랙 선택" aria-pressed={playing}
     aria-description="판 위에 놓으면 재생합니다. 안쪽은 나중 트랙, 바깥쪽은 이전 트랙입니다. 판 밖으로 빼면 정지합니다."
     onPointerDown={(event) => {
@@ -65,9 +70,11 @@ export function ReplayArm({ playing, tracks, track, choose, toggle, stop, stage,
       const next = measure();
       if (!next) return;
       setLayout(next);
-      pointer.current = { id: event.pointerId, layout: next, angle, start: Math.atan2(event.clientY - next.y, event.clientX - next.x) };
+      const matrix = new DOMMatrixReadOnly(getComputedStyle(arm.current).transform);
+      const visibleAngle = Math.atan2(matrix.b, matrix.a) * 180 / Math.PI;
+      pointer.current = { id: event.pointerId, layout: next, angle: visibleAngle, start: Math.atan2(event.clientY - next.y, event.clientX - next.x) };
       event.currentTarget.setPointerCapture(event.pointerId);
-      setDrag(angle);
+      setDrag(visibleAngle);
     }}
     onPointerMove={(event) => { if (pointer.current?.id === event.pointerId) setDrag(point(event, pointer.current)); }}
     onPointerUp={(event) => finish(event, true)} onPointerCancel={finish} onLostPointerCapture={finish}
@@ -89,5 +96,5 @@ export function ReplayArm({ playing, tracks, track, choose, toggle, stop, stage,
       <path d="m43 181-7 17" fill="none" stroke="#d9d9d9" strokeWidth="10" />
       <rect x="18" y="194" width="35" height="15" rx="5" fill="#d9d9d9" transform="rotate(-35 36 203)" />
     </svg>
-  </button>;
+  </button></div>;
 }

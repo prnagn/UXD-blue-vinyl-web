@@ -2,7 +2,7 @@ import React from 'react';
 import { useMedia } from './ui';
 
 // Fixed slots keep old grooves and their pins still as the LP fills inward.
-export const grooveRadius = (index) => 47 - Math.min(79, Math.max(0, index)) * 25 / 79;
+export const grooveRadius = (index) => 47 - 25 * (Math.min(79, Math.max(0, index)) / 79) ** .85;
 
 export function engravedPhotos(album) {
   const grooves = (album?.grooves || []).slice(0, 80);

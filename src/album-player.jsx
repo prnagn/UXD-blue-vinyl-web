@@ -15,6 +15,7 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
   const tracks = albumPlaybackTracks(allTracks);
   const track = tracks.find((entry) => entry.id === (selectedId || selectedTrack?.id)) || tracks[0];
   const [playing, setPlaying] = useState(false);
+  const [loadingId, setLoadingId] = useState(autoStart ? track?.id || '' : '');
   const [reveal, setReveal] = useState(track?.kind === 'spotify');
   const [error, setError] = useState('');
   const [zoom, setZoom] = useState('record');
@@ -22,7 +23,9 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
   const [position, setPosition] = useState({ id: '', fraction: 0 });
   const player = useRef(null);
   const spotifyController = useRef(null);
-  const spotifyIntent = useRef('');
+  const pausePending = useRef(Promise.resolve());
+  const playbackEpoch = useRef(0);
+  const spotifyIntent = useRef(autoStart && track?.kind === 'spotify' ? track.id : '');
   const activeTrack = useRef(track?.id);
   activeTrack.current = track?.id;
   const wantsPlayback = useRef(Boolean(autoStart));
@@ -38,7 +41,12 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
   const days = playbackDays(tracks, album.start);
   const day = days.find((entry) => entry.indices.includes(index));
   const progress = position.id === track?.id ? position.fraction : 0;
-  useEffect(() => () => clearTimeout(zoomTimer.current), []);
+  useEffect(() => () => {
+    playbackEpoch.current++;
+    clearTimeout(zoomTimer.current);
+    player.current?.pause();
+    spotifyController.current?.pause();
+  }, []);
 
   useEffect(() => {
     const media = player.current;
@@ -50,32 +58,50 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
 
   async function start(media) {
     if (!media) return;
-    try { await media.play(); }
+    const epoch = playbackEpoch.current;
+    try {
+      await pausePending.current;
+      if (epoch !== playbackEpoch.current || media !== player.current || !wantsPlayback.current) return;
+      await media.play();
+    }
     catch (err) {
       if (media !== player.current || !wantsPlayback.current || err.name === 'AbortError') return;
       wantsPlayback.current = false;
       setPlaying(false);
+      setLoadingId('');
       setError('이 트랙을 재생할 수 없어요.');
     }
   }
 
   function stop() {
+    playbackEpoch.current++;
     wantsPlayback.current = false;
     spotifyIntent.current = '';
     player.current?.pause();
-    spotifyController.current?.pause();
+    const controller = spotifyController.current;
+    if (controller) pausePending.current = pausePending.current.then(() => controller.pause()).catch(() => false);
     setPlaying(false);
+    setLoadingId('');
+  }
+
+  async function resumeSpotify(controller, id) {
+    const epoch = playbackEpoch.current;
+    await pausePending.current;
+    if (epoch !== playbackEpoch.current || activeTrack.current !== id) return;
+    const success = await controller.resume();
+    if (epoch === playbackEpoch.current && success === false && activeTrack.current === id) setLoadingId('');
   }
 
   function select(entry, autoplay = false) {
     if (!entry) return;
     if (autoplay && entry.kind === 'spotify') spotifyService?.activatePlayback?.();
     stop();
+    setLoadingId(autoplay ? entry.id : '');
     wantsPlayback.current = autoplay && entry.kind !== 'spotify';
     spotifyIntent.current = autoplay && entry.kind === 'spotify' ? entry.id : '';
     setReveal(entry.kind === 'spotify');
     if (entry.id === track?.id && autoplay) {
-      if (entry.kind === 'spotify') spotifyController.current?.resume();
+      if (entry.kind === 'spotify' && spotifyController.current) resumeSpotify(spotifyController.current, entry.id);
       else start(player.current);
     }
     else onTrack(entry);
@@ -85,7 +111,9 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
     if (isSpotify) {
       spotifyService?.activatePlayback?.();
       setReveal(true);
-      if (spotifyController.current) spotifyController.current.togglePlay();
+      if (playing || loadingId === track.id) { stop(); return; }
+      setLoadingId(track.id);
+      if (spotifyController.current) resumeSpotify(spotifyController.current, track.id);
       else spotifyIntent.current = track.id;
       return;
     }
@@ -93,7 +121,7 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
     const media = player.current;
     if (!media) return;
     if (wantsPlayback.current) stop();
-    else { wantsPlayback.current = true; setError(''); start(media); }
+    else { wantsPlayback.current = true; setLoadingId(track.id); setError(''); start(media); }
   }
 
   function move(direction) {
@@ -105,11 +133,20 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
     stop();
     setReveal(false);
     setZoom('transition');
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     zoomTimer.current = setTimeout(() => {
       zoomTimer.current = null;
       setZoom('moments');
-    }, reduceMotion ? 0 : 290);
+    }, 650);
+  }
+
+  function closeMoments() {
+    if (zoomTimer.current !== null) return;
+    setZoom('returning');
+    zoomTimer.current = setTimeout(() => {
+      zoomTimer.current = null;
+      setZoom('record');
+      setReveal(isSpotify);
+    }, 650);
   }
 
   function pinchDistance(touches) {
@@ -121,20 +158,26 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
   const events = {
     ref: player,
     src: source,
-    onPlay: (event) => { if (wantsPlayback.current) setPlaying(true); else event.currentTarget.pause(); },
-    onPause: () => setPlaying(false),
+    onPlay: (event) => {
+      if (event.currentTarget !== player.current) return;
+      if (wantsPlayback.current) { setPlaying(true); setLoadingId(''); }
+      else event.currentTarget.pause();
+    },
+    onPause: (event) => { if (event.currentTarget === player.current) setPlaying(false); },
     onTimeUpdate: (event) => {
       const media = event.currentTarget;
       setPosition({ id: track.id, fraction: media.duration > 0 ? media.currentTime / media.duration : 0 });
     },
-    onEnded: () => { stop(); setPosition({ id: track.id, fraction: 1 }); },
-    onError: () => { stop(); setError('이 트랙을 열 수 없어요.'); },
+    onEnded: (event) => { if (event.currentTarget === player.current) { stop(); setPosition({ id: track.id, fraction: 1 }); } },
+    onError: (event) => { if (event.currentTarget === player.current) { stop(); setError('이 트랙을 열 수 없어요.'); } },
   };
   const showVideo = track?.kind === 'video' && (reveal || playing);
 
-  if (zoom === 'moments') return <MomentMap album={album} tracks={allTracks} back={() => { setZoom('record'); setReveal(isSpotify); }} />;
+  const momentLayer = ['transition', 'moments', 'returning'].includes(zoom);
+  const zoomingIn = zoom === 'transition' || zoom === 'moments';
 
-  return <div className={'album-focus' + (zoom === 'transition' ? ' focus-zooming' : '') + (zoom === 'spread' ? ' focus-spread' : '')}>
+  return <div className="album-replay-scene"><div className={'album-focus' + (zoomingIn ? ' focus-zooming' : '') + (zoom === 'spread' ? ' focus-spread' : '')}
+    inert={momentLayer} aria-hidden={momentLayer}>
     <Top title={autoStart ? 'RECEIVED RECORD' : 'BLUE VINYL'} back={back} action={send} actionIcon="plane" actionLabel="여행지로 LP 보내기" />
     <div className="focus-stage zoom-gesture" ref={stage}
       onTouchStart={(event) => { startDistance.current = pinchDistance(event.touches); }}
@@ -153,13 +196,13 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
       onTouchCancel={() => { startDistance.current = 0; }}>
       {zoom === 'spread' && <ScatteredPhotos entries={album.entries} currentPhoto={currentPhoto} />}
       <button className="focus-record" onClick={play} disabled={!track} aria-label={isMedia ? (playing ? '일시정지' : '트랙 재생') : '트랙 열기'}>
-        <Vinyl image={art} color={album.color} playing={playing} />
+        <Vinyl image={art} color={album.color} playing={playing} rotatable />
         <svg className="focus-rings" viewBox="0 0 100 100" aria-hidden="true">
           {tracks.map((entry, i) => <circle key={entry.id} cx="50" cy="50" r={trackRadius(i, tracks.length, { radius: 50 })}
             fill="none" stroke={entry.id === track?.id && playing ? '#f1dfae' : '#c4c2bd'} strokeWidth=".12" opacity={entry.id === track?.id && playing ? '.45' : '.16'} />)}
         </svg>
       </button>
-      <ReplayArm playing={playing} tracks={tracks} track={track} choose={select} toggle={play} stop={stop} stage={stage} view={zoom} />
+      <ReplayArm playing={playing} loading={loadingId === track?.id} tracks={tracks} track={track} choose={select} toggle={play} stop={stop} stage={stage} view={zoom} />
       <div className="focus-view-controls">
         <button className="focus-zoom" onClick={() => setZoom(zoom === 'spread' ? 'record' : 'spread')} disabled={zoom === 'transition'} aria-pressed={zoom === 'spread'}>
           <Icon name={zoom === 'spread' ? 'zoom' : 'zoom-out'} size={16} />{zoom === 'spread' ? 'LP 보기' : 'LP 축소'}
@@ -197,11 +240,11 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
       {isSpotify && reveal && <div className="focus-spotify" aria-label="기록한 Spotify 곡">
         <SpotifyPlayer key={track.id} song={track.spotify} controllerRef={spotifyController}
           onProgress={(fraction) => { if (activeTrack.current === track.id) setPosition({ id: track.id, fraction }); }}
-          onPlaying={(value) => { if (activeTrack.current === track.id) setPlaying(value); }}
+          onPlaying={(value) => { if (activeTrack.current === track.id) { setPlaying(value); if (value) setLoadingId(''); } }}
           onReady={(controller) => {
             if (activeTrack.current === track.id && spotifyIntent.current === track.id) {
               spotifyIntent.current = '';
-              controller.resume();
+              resumeSpotify(controller, track.id);
             }
           }} />
       </div>}
@@ -219,5 +262,9 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
       {track.kind === 'photo' && source && <img className="media-photo" src={source} alt={track.name} />}
       {track.kind === 'memo' && <blockquote className="memo-view">{track.note}</blockquote>}
     </section>}
+  </div>
+    {momentLayer && <div className={'moment-zoom-layer' + (zoom === 'transition' ? ' entering' : zoom === 'returning' ? ' leaving' : '')}>
+      <MomentMap album={album} tracks={allTracks} back={closeMoments} active={zoom === 'moments'} />
+    </div>}
   </div>;
 }
