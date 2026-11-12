@@ -1,16 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
+import { albumTitle, Icon, useMedia, Vinyl } from './ui';
 import { albumArt } from './archive';
-import { albumTitle, Cover, dateLabel, Icon, useMedia, Vinyl } from './ui';
-
-const unfoldTime = 2000;
 
 export function Inbox({ items, index, onIndex, close, play, save, discard, busy, notice }) {
   const dialog = useRef(null);
   const delivery = items[index] || items[0];
   const album = delivery.album;
-  const art = useMedia(albumArt(album));
-  const [openedId, setOpenedId] = useState('');
-  const opened = openedId === delivery.id;
+  const photo = useMedia(albumArt(album));
 
   useEffect(() => { dialog.current.showModal(); }, []);
   useEffect(() => {
@@ -24,22 +20,8 @@ export function Inbox({ items, index, onIndex, close, play, save, discard, busy,
     onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
     <button className="icon-button delivery-close" aria-label="닫기" onClick={close}><Icon name="close" /></button>
     <div className="delivery-stage" key={delivery.id}>
-      <div className="delivery-letter">
-        <div className="letter-left-half" aria-hidden="true">
-          <span className="letter-paper letter-top-quarter" />
-          <span className="letter-paper letter-bottom-fold" />
-        </div>
-        <div className="letter-right-fold" aria-hidden="true">
-          <span className="letter-paper letter-top-quarter" />
-          <span className="letter-paper letter-bottom-fold" />
-        </div>
-        <div className="letter-crease" aria-hidden="true" />
-        <div className="letter-contents">
-          <span className="letter-airmail-mark" aria-hidden="true">PAR AVION</span>
-          <span className="letter-postmark" aria-hidden="true">{album.city || albumTitle(album)}<small>{dateLabel(album.start)}</small></span>
-          <Cover album={album} />
-          <Vinyl image={art} color={album.color || '#d9d9d7'} />
-        </div>
+      <div className="delivery-envelope">
+        <Vinyl image={photo} color={album.color || '#d9d9d7'} />
       </div>
     </div>
     <div className="delivery-details" key={'details-' + delivery.id}>
@@ -50,10 +32,9 @@ export function Inbox({ items, index, onIndex, close, play, save, discard, busy,
       <button className="icon-button" aria-label="다음 받은 LP" disabled={!opened || busy || index === items.length - 1} onClick={() => onIndex(index + 1)}><Icon name="next" size={17} /></button>
     </nav>}
     <div className="delivery-actions">
-      <button className="primary" disabled={busy || !opened} onClick={() => play(delivery)}><Icon name="play" size={15} /> 지금 재생</button>
-      <button className="secondary delivery-save" disabled={busy || !opened} onClick={() => save(delivery)}>선반에 추가</button>
-      <button className="secondary delivery-discard" disabled={busy || !opened} onClick={() => discard(delivery)}>버리기</button>
-    </div>
+      <button className="primary" disabled={busy} onClick={() => play(delivery)}><Icon name="play" size={15} /> 지금 재생</button>
+      <button className="secondary delivery-save" disabled={busy} onClick={() => save(delivery)}>선반에 추가</button>
+      <button className="secondary delivery-discard" disabled={busy} onClick={() => discard(delivery)}>버리기</button>
     </div>
     {notice && <p className="inbox-notice" role="status">{notice}</p>}
   </dialog>;

@@ -519,26 +519,11 @@ button.shipping-location{min-height:30px;border:0;background:none;text-decoratio
 .inbox-dialog{width:min(calc(var(--app-width) - 26px),340px);max-width:100%;max-height:calc(100dvh - 28px);padding:34px 8px 10px;border:0;color:inherit;background:transparent}
 .inbox-dialog::backdrop{background:#1013249c;backdrop-filter:blur(6px)}
 .delivery-close{position:absolute;right:1px;top:0}
-.delivery-stage{position:relative;display:grid;place-items:center;padding:17px 0 7px;perspective:1100px}
-.delivery-letter{position:relative;width:94%;max-width:318px;aspect-ratio:.8;transform-style:preserve-3d;perspective:1100px}
-.letter-left-half,.letter-right-fold{position:absolute;top:0;bottom:0;width:50%;transform-style:preserve-3d}
-.letter-left-half{left:0}
-.letter-right-fold{left:50%;transform-origin:0 50%;animation:letter-open-side var(--letter-duration,2s) cubic-bezier(.35,0,.2,1) both}
-.letter-paper{position:absolute;left:0;width:100%;height:50%;display:block;background:radial-gradient(#8b744b30 .55px,transparent .9px) 0 0/3px 3px,linear-gradient(29deg,transparent 49.6%,#9e885525 50%,transparent 50.5%),linear-gradient(145deg,#e5d7a6,#d6c494);box-shadow:inset 0 0 0 1px #a28b5930,0 5px 14px #0a0e1b33;backface-visibility:visible}
-.letter-top-quarter{top:0}
-.letter-bottom-fold{top:50%;transform-origin:50% 0;animation:letter-open-bottom var(--letter-duration,2s) cubic-bezier(.35,0,.2,1) both}
-.letter-crease{position:absolute;z-index:3;inset:0;transform:translateZ(1.5px);pointer-events:none;background:linear-gradient(90deg,transparent 49.2%,#806d3930 50%,#fff5 50.3%,transparent 51%),linear-gradient(0deg,transparent 49.6%,#91794b2e 50%,#fff3 50.4%,transparent 51%);animation:letter-unmask var(--letter-duration,2s) linear both}
-.letter-contents{position:absolute;z-index:4;inset:0;transform:translateZ(2px);animation:letter-unmask var(--letter-duration,2s) linear both}
-.letter-contents .cover{position:absolute;z-index:2;width:58%;aspect-ratio:1;left:11%;top:27%;font-size:36px;border-radius:1px;transform:rotate(-1deg);box-shadow:0 5px 14px #443a2559}
-.letter-contents .vinyl{position:absolute;z-index:1;width:55%;left:35%;top:28.5%;box-shadow:0 5px 14px #443a2559}
-.letter-airmail-mark{position:absolute;left:5%;top:5%;padding:3px 6px;border:1px solid #a7835a;font:700 8px var(--serif);letter-spacing:.2em;color:#a7835a}
-.letter-postmark{position:absolute;right:7%;top:4%;width:20%;aspect-ratio:1;border:1px solid #a7835a88;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;transform:rotate(-12deg);font:italic 10px var(--serif);color:#9b7953;overflow:hidden}
-.letter-postmark small{font:6px system-ui;color:inherit}
-.delivery-details{animation:letter-actions var(--letter-duration,2s) ease-out both}
-@keyframes letter-open-side{0%,8%{transform:translateZ(.8px) rotateY(-180deg)}52%,100%{transform:translateZ(.8px) rotateY(0)}}
-@keyframes letter-open-bottom{0%,45%{transform:translateZ(.4px) rotateX(180deg)}90%,100%{transform:translateZ(.4px) rotateX(0)}}
-@keyframes letter-unmask{0%,46%{clip-path:inset(0 100% 100% 0)}52%{clip-path:inset(0 0 50% 0)}90%,100%{clip-path:inset(0)}}
-@keyframes letter-actions{0%,90%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:translateY(0)}}
+.delivery-stage{position:relative;display:grid;place-items:center;padding:17px 0 7px;overflow:hidden}
+.delivery-envelope{width:82%;max-width:252px;aspect-ratio:1;position:relative;border-radius:10px;background:linear-gradient(142deg,#f5f0e5,#e7ded0);box-shadow:0 12px 25px #11162860;animation:delivery-open .48s .32s ease-out both}
+.delivery-envelope::before{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(43deg,transparent 49%,#b8a38f35 50%,transparent 51%),linear-gradient(-43deg,transparent 49%,#b8a38f22 50%,transparent 51%);pointer-events:none}
+.delivery-envelope .cover{position:absolute;z-index:1;width:50%;aspect-ratio:1;left:9%;top:11%;font-size:36px;border-radius:4px;box-shadow:0 3px 7px #33271b38}
+.delivery-envelope .vinyl{position:absolute;z-index:2;width:78%;left:11%;top:13%;box-shadow:0 4px 9px #241f1c4d;animation:delivery-disc .6s .41s ease-out both}
 .delivery-caption{text-align:center;padding:6px 0 11px}
 .delivery-caption h2{margin:0 0 3px;font:22px var(--serif);overflow-wrap:anywhere}
 .delivery-nav{font-size:10px;letter-spacing:.13em;color:var(--muted)}
@@ -653,7 +638,6 @@ button.shipping-location{min-height:30px;border:0;background:none;text-decoratio
 @media(max-width:599px){.app{--app-width:100vw}}
 @media(max-width:345px){.content{padding-inline:17px}.field-pair{gap:7px}.record-grid{gap:5px}.shelf{padding-inline:8%}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
-@media(prefers-reduced-motion:reduce){.letter-right-fold,.letter-bottom-fold,.letter-contents,.letter-crease,.delivery-details{animation-duration:var(--letter-duration,2s)!important}}
 @media(prefers-reduced-motion:reduce){.airmail-flight{animation-duration:14.222s!important}}
 @media(prefers-reduced-motion:reduce){.parcel-arrived:not(.parcel-opening) .parcel-sleeve,.parcel-arrived:not(.parcel-opening) .parcel-box{animation-name:parcel-arrived-glow;animation-duration:4.2s!important}.parcel-opening .parcel-paper{animation-name:parcel-paper-fade;animation-duration:1.2s!important}.parcel-opening .parcel-inner{animation-name:new-details-in;animation-duration:1.2s!important}}
 @media(prefers-reduced-motion:reduce){.draft-photo-pin.new-photo-pin{animation-name:draft-pin-rise-soft;animation-duration:.65s!important}}
