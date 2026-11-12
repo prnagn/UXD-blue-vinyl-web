@@ -15,6 +15,8 @@ p,h1,h2,blockquote{margin:0}
 .app{--app-width:min(100vw, 432px);position:relative;width:var(--app-width);height:100dvh;overflow:hidden;background:var(--blue);isolation:isolate}
 .screen{height:100%;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding-bottom:max(28px,env(safe-area-inset-bottom))}
 .screen::-webkit-scrollbar{display:none}
+.screen-load-state{min-height:55%;padding:32px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--muted);font-size:13px;text-align:center}
+.screen-load-state button{max-width:230px}
 .screen:not(.home){background:linear-gradient(164deg,#535d81 0%,#535d81 37%,#343c57 80%,#242b40 100%)}
 .screen.play,.screen.blank,.screen.create,.screen.trip,.screen.moment-summary,.screen.draft-disc{background:#535d81;padding-bottom:0}
 .screen.trip{overflow:hidden}

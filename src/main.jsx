@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { addDelivery, albumArt, albumFile, deliverySchedule, ensureWelcomeDelivery, importAlbum, loadAlbums, loadInbox, localDay, localTime, resetArchive, resolveDelivery, saveAlbum, trackArt, visibleShelfAlbums } from './archive';
 import { AlbumPlayer } from './album-player';
@@ -9,7 +9,7 @@ import { HomeTurntable } from './home-turntable';
 import { ParcelShelf } from './parcel-shelf';
 import { availableOnTurntable, parcelState } from './parcel-state';
 import { JourneyConfirm, PressCompleted, PressRecord } from './press-record';
-import { ReturnMail, ShippingScreen } from './shipping';
+import { LazyScreen } from './lazy-screen';
 import { TripMoment } from './trip-moment';
 import { LiveCapture } from './live-capture';
 import { useSpotify } from './spotify';
@@ -19,8 +19,11 @@ import { Inbox } from './inbox';
 import { FlyingAirmail } from './flying-airmail';
 import { Arm, Icon, Plane, PullSleeve, SharedTag, SleeveFace, Top, Vinyl, albumTitle, dateLabel, entryIcons, useMedia } from './ui';
 import { Recorder, TrackMedia } from './recorder';
-import { TravelMap } from './map';
 import './style.css';
+
+const TravelMap = lazy(() => import('./map').then((module) => ({ default: module.TravelMap })));
+const ShippingScreen = lazy(() => import('./shipping').then((module) => ({ default: module.ShippingScreen })));
+const ReturnMail = lazy(() => import('./shipping').then((module) => ({ default: module.ReturnMail })));
 
 const newTrip = () => ({ name: '', city: '', country: '', start: localDay(), end: '' });
 const kindName = { photo: '사진', audio: '소리', video: '영상', memo: '메모' };
@@ -528,9 +531,9 @@ function App() {
           tracks={tracks} track={track} selectedId={trackId} onTrack={playTrack} back={returnFromPlayer} busy={busy} autoStart={Boolean(previewDelivery)}
           send={previewDelivery ? undefined : () => { setNotice(''); go('send-lp'); }}
           save={previewDelivery ? () => finishDelivery(previewDelivery, true) : undefined} />}
-        {page === 'send-lp' && album && <ReturnMail album={album} back={() => go('play')}
+        {page === 'send-lp' && album && <LazyScreen back={() => go('play')}><ReturnMail album={album} back={() => go('play')}
           createLink={['http:', 'https:'].includes(window.location.protocol) ? makeShareLink : undefined}
-          shareLink={shareLink} download={downloadAlbum} busy={busy} />}
+          shareLink={shareLink} download={downloadAlbum} busy={busy} /></LazyScreen>}
 
         {page === 'review' && album && <>
           <Top title="TODAY’S TRACK" back={returnFromPlayer} action={() => setSheet('edit')} actionIcon="edit" actionLabel="트랙 편집" />
@@ -561,8 +564,8 @@ function App() {
         {page === 'press' && album && <PressRecord photo={pressPhoto} busy={busy} back={() => go(pressFrom)}
           choose={() => chooseArt()} complete={pressAlbum} />}
         {page === 'complete' && album && <PressCompleted album={album} photo={cover} next={showShipping} />}
-        {page === 'shipping' && album?.delivery && <ShippingScreen album={album} busy={busy} save={saveDelivery} />}
-        {page === 'map' && <TravelMap albums={shelfAlbums.filter((item) => item.phase === 'pressed')} back={goHome} open={openAlbum} />}
+        {page === 'shipping' && album?.delivery && <LazyScreen back={goHome}><ShippingScreen album={album} busy={busy} save={saveDelivery} /></LazyScreen>}
+        {page === 'map' && <LazyScreen back={goHome}><TravelMap albums={shelfAlbums.filter((item) => item.phase === 'pressed')} back={goHome} open={openAlbum} /></LazyScreen>}
       </main>
 
       {sheet === 'inbox' && inbox.length > 0 && <Inbox items={inbox} index={inboxIndex} onIndex={setInboxIndex} close={() => setSheet('')}
