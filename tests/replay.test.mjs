@@ -6,6 +6,27 @@ import { startAmbient } from '../src/ambient-audio.js';
 import { parkedAngle, needleRadius, trackRadius, trackAngle } from '../src/replay-geometry.js';
 import './capture.test.mjs';
 import { playbackDays, dayPosition, trackAtPosition } from '../src/playback-days.js';
+import { centeredScroll, reorderPosition, reorderSpacing } from '../src/carousel-layout.js';
+
+for (const width of [280, 390, 432]) {
+  for (const count of [1, 3, 8]) {
+    const slideWidth = width * .8;
+    const contentWidth = width * .2 + count * slideWidth;
+    for (let index = 0; index < count; index++) {
+      const left = width * .1 + index * slideWidth;
+      const target = centeredScroll(left, slideWidth, width);
+      assert(Math.abs(left - target + slideWidth / 2 - width / 2) < .00001, 'every photo, including the final new-recording circle, must center in the viewport');
+      assert(target <= contentWidth - width + .00001, 'end spacing must allow the final circle to reach the center');
+    }
+    const step = reorderSpacing(width, count);
+    const cards = Array.from({ length: count }, (_, at) => reorderPosition(at, count, count - 1, 0, step, false));
+    assert(Math.abs(cards[0].x + cards.at(-1).x) < .00001, 'the overlapping discs must stay centered as a group');
+    assert(cards.at(-1).x - cards[0].x <= width * .65 + .00001, 'the row must fit on narrow screens');
+    const before = reorderPosition(count - 1, count, count - 1, -step, step, true);
+    const after = reorderPosition(0, count, count - 1, -step, step, true);
+    assert.deepEqual(before, after, 'the held disc must not jump when neighboring discs swap slots');
+  }
+}
 
 const dated = [{ day: '2026-11-10' }, { day: '2026-11-10' }, { day: '2026-11-12' }];
 const days = playbackDays(dated, '2026-11-10');
@@ -88,8 +109,12 @@ try {
   const photoPins = engravedPhotos(pinnedAlbum);
   assert.deepEqual(photoPins.map(pin => pin.photo.id), ['p2', 'p1'], 'pins must follow the engraved photo order and exclude pending photos');
   for (const pin of photoPins) {
-    assert(Math.abs(Math.hypot(pin.x - 50, pin.y - 50) - grooveRadius(pin.grooveIndex, 1)) < .00001, 'each photo pin foot must land on its own engraved ring');
+    assert(Math.abs(Math.hypot(pin.x - 50, pin.y - 50) - grooveRadius(pin.grooveIndex)) < .00001, 'each photo pin foot must land on its own engraved ring');
   }
+  assert.equal(grooveRadius(0), 47, 'the first groove must start at the outside edge');
+  for (let at = 1; at < 80; at++) assert(grooveRadius(at) < grooveRadius(at - 1), 'later grooves must fill inward');
+  const filledPins = engravedPhotos({ ...pinnedAlbum, grooves: [...pinnedAlbum.grooves, { entryIds: [standalone.id] }] });
+  assert.deepEqual(filledPins.slice(0, photoPins.length), photoPins, 'adding a groove must not move previous grooves or their photo pins');
   assert.deepEqual(engravedPhotos({ ...album, grooves: [] }), [], 'an empty LP must not show photo pins');
   assert.deepEqual(engravedPhotos({ ...album, grooves: [{ entryIds: ['a2', 'memo'] }] }), [], 'audio-only or memo grooves must not invent a photo');
   const { BlankRecord } = await server.ssrLoadModule('/src/trip-details.jsx');

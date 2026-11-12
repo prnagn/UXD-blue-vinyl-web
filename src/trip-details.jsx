@@ -14,7 +14,7 @@ export function BlankRecord({ album, back, enter, finish, home, record, grooveCo
       <Vinyl color="#36363a" />
       {grooveCount > 0 && <svg className="engraved-grooves" viewBox="0 0 100 100" aria-hidden="true">
         {Array.from({ length: visibleGrooves }, (_, index) => {
-          const radius = grooveRadius(index, visibleGrooves);
+          const radius = grooveRadius(index);
           const isNew = engraving && index === visibleGrooves - 1;
           return <g key={index} className={isNew ? 'new-groove' : undefined}>
             <circle className="groove-shadow" cx="50" cy="50" r={radius - .22} />

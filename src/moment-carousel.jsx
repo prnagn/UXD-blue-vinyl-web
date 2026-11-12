@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon, useMedia } from './ui';
+import { centeredScroll, reorderPosition, reorderSpacing } from './carousel-layout';
 
 function Picture({ group }) {
   const photo = useMedia(group?.photo);
@@ -20,7 +21,8 @@ export function MomentCarousel({ groups, selectedId, select, previewOrder, commi
 
   function scrollTo(at, behavior = 'smooth') {
     const element = viewport.current;
-    if (element) element.scrollTo({ left: at * element.clientWidth * .8, behavior });
+    const slide = element?.querySelectorAll('.carousel-slide')[at];
+    if (slide) element.scrollTo({ left: centeredScroll(slide.offsetLeft, slide.offsetWidth, element.clientWidth), behavior });
   }
 
   function scheduleSettle() {
@@ -30,7 +32,13 @@ export function MomentCarousel({ groups, selectedId, select, previewOrder, commi
       const element = viewport.current;
       if (pointer.current || !element) return;
       const current = latest.current;
-      const next = Math.max(0, Math.min(current.groups.length, Math.round(element.scrollLeft / (element.clientWidth * .8))));
+      const slides = [...element.querySelectorAll('.carousel-slide')];
+      let next = 0;
+      let closest = Infinity;
+      slides.forEach((slide, at) => {
+        const distance = Math.abs(centeredScroll(slide.offsetLeft, slide.offsetWidth, element.clientWidth) - element.scrollLeft);
+        if (distance < closest) { closest = distance; next = at; }
+      });
       element.style.scrollSnapType = '';
       const id = current.groups[next]?.id || 'new';
       if (id !== current.selectedId) current.select(id);
@@ -96,13 +104,13 @@ export function MomentCarousel({ groups, selectedId, select, previewOrder, commi
     const dx = event.clientX - active.x;
     const dy = event.clientY - active.y;
     if (active.editing) {
-      const to = Math.max(0, Math.min(active.ids.length - 1, active.start + Math.round(dx / 78)));
+      const to = Math.max(0, Math.min(active.ids.length - 1, active.start + Math.round(dx / active.step)));
       const from = active.ids.indexOf(active.id);
       if (from !== to) {
         active.ids.splice(from, 1); active.ids.splice(to, 0, active.id);
         previewOrder([...active.ids]);
       }
-      setEditing({ id: active.id, start: active.start, dx });
+      setEditing({ id: active.id, start: active.start, dx, step: active.step });
     } else {
       if (Math.hypot(dx, dy) > 10) clearTimeout(active.timer);
       if (Math.abs(dx) > Math.abs(dy) * 1.2) viewport.current.scrollLeft = active.scroll - dx;
@@ -125,6 +133,7 @@ export function MomentCarousel({ groups, selectedId, select, previewOrder, commi
               if (event.button !== 0 || pointer.current || busy || at !== index) return;
               clearTimeout(settled.current);
               const active = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, id: group?.id, start: index,
+                step: reorderSpacing(viewport.current.clientWidth, groups.length),
                 scroll: viewport.current.scrollLeft, ids: groups.map((item) => item.id), original: groups.map((item) => item.id), editing: false };
               pointer.current = active;
               event.currentTarget.setPointerCapture(event.pointerId);
@@ -134,7 +143,7 @@ export function MomentCarousel({ groups, selectedId, select, previewOrder, commi
                 active.editing = true;
                 // Capture on the stable viewport before reordering moves photo nodes.
                 viewport.current.setPointerCapture(active.pointerId);
-                setEditing({ id: active.id, start: index, dx: 0 });
+                setEditing({ id: active.id, start: index, dx: 0, step: active.step });
                 onEditing(true);
               }, 420);
             }}
@@ -151,11 +160,15 @@ export function MomentCarousel({ groups, selectedId, select, previewOrder, commi
       </div>
     </div>
     {editing && <div className="carousel-reorder" aria-label="순간 순서 편집">
-      <div className={'reorder-strip' + (Math.abs(editing.dx) > 8 ? ' moving' : '')} style={{ '--strip-x': -(editing.start + .5) * 78 + 'px', '--strip-origin': (editing.start + .5) * 78 + 'px' }}>
-        {groups.map((group, i) => <div key={group.id} className={'reorder-thumb' + (group.id === editing.id ? ' dragged' : '')}
-          style={group.id === editing.id ? { transform: 'translateX(' + (editing.dx - (i - editing.start) * 78) + 'px) scale(1.15)' } : undefined}>
-          <Picture group={group} />
-        </div>)}
+      <div className="reorder-strip">
+        {groups.map((group, i) => {
+          const dragged = group.id === editing.id;
+          const position = reorderPosition(i, groups.length, editing.start, editing.dx, editing.step, dragged);
+          return <div key={group.id} className={'reorder-thumb' + (dragged ? ' dragged' : '')}
+            style={{ '--card-x': position.x + 'px', '--card-y': position.y + 'px', '--card-z': position.z + 'px', zIndex: dragged ? groups.length + 1 : groups.length - i }}>
+            <div className="reorder-disc"><Picture group={group} /></div>
+          </div>;
+        })}
       </div>
     </div>}
     <div className="moment-photo-count" aria-live="polite">{index < groups.length ? (index + 1) + ' / ' + groups.length : '+'}</div>

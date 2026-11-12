@@ -1,14 +1,15 @@
 import React from 'react';
 import { useMedia } from './ui';
 
-export const grooveRadius = (index, count) => 22 + 26 * (index + 1) / (count + 1);
+// Fixed slots keep old grooves and their pins still as the LP fills inward.
+export const grooveRadius = (index) => 47 - Math.min(79, Math.max(0, index)) * 25 / 79;
 
 export function engravedPhotos(album) {
   const grooves = (album?.grooves || []).slice(0, 80);
   const photos = new Map((album?.entries || []).filter((entry) => entry.kind === 'photo').map((photo) => [photo.id, photo]));
   return grooves.flatMap((groove, grooveIndex) => {
     const selected = [...new Set(groove.entryIds || [])].map((id) => photos.get(id)).filter(Boolean);
-    const radius = grooveRadius(grooveIndex, grooves.length);
+    const radius = grooveRadius(grooveIndex);
     return selected.map((photo, index) => {
       const angle = (selected.length === 1 ? -55 + grooveIndex % 3 * 22 : -70 + index / (selected.length - 1) * 105) * Math.PI / 180;
       return { photo, grooveIndex, radius, x: 50 + radius * Math.cos(angle), y: 50 + radius * Math.sin(angle), order: index };
