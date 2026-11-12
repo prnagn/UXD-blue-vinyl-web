@@ -5,8 +5,8 @@ import { AlbumPlayer } from './album-player';
 import { ArtPicker } from './art-picker';
 import { BlankRecord, TripDetails } from './trip-details';
 import { NewAlbum } from './new-album';
-import { HomeTurntable } from './home-turntable';
-import { ParcelShelf } from './parcel-shelf';
+import { HomeScene } from './home-scene';
+import Boot from './boot';
 import { availableOnTurntable, parcelState } from './parcel-state';
 import { JourneyConfirm, PressCompleted, PressRecord } from './press-record';
 import { LazyScreen } from './lazy-screen';
@@ -16,10 +16,11 @@ import { useSpotify } from './spotify';
 import { SpotifyPlaybackContext } from './spotify-context';
 import { reorderMoments } from './moment-groups';
 import { Inbox } from './inbox';
-import { FlyingAirmail } from './flying-airmail';
-import { Arm, Icon, Plane, PullSleeve, SharedTag, SleeveFace, Top, Vinyl, albumTitle, dateLabel, entryIcons, useMedia } from './ui';
+import { Arm, Icon, Plane, Top, Vinyl, albumTitle, entryIcons, useMedia } from './ui';
 import { Recorder, TrackMedia } from './recorder';
 import './style.css';
+import './home.css';
+import './boot.css';
 
 const TravelMap = lazy(() => import('./map').then((module) => ({ default: module.TravelMap })));
 const ShippingScreen = lazy(() => import('./shipping').then((module) => ({ default: module.ShippingScreen })));
@@ -29,7 +30,6 @@ const newTrip = () => ({ name: '', city: '', country: '', start: localDay(), end
 const kindName = { photo: '사진', audio: '소리', video: '영상', memo: '메모' };
 const colors = ['#9da5b6', '#b99086', '#86a198', '#ae9cae'];
 const incoming = (album) => ({ id: crypto.randomUUID(), album, receivedAt: Date.now() });
-const completionTime = (album) => Date.parse(album.completedAt || album.end || album.start) || 0;
 
 function App() {
   const [records, setRecords] = useState([]);
@@ -443,8 +443,7 @@ function App() {
   }
 
   const goHome = () => { setPreview(''); setPreviewDelivery(null); go('home'); };
-  const latest = shelfAlbums.filter((item) => item.phase === 'pressed' && availableOnTurntable(item, today))
-    .sort((a, b) => completionTime(b) - completionTime(a))[0];
+  const latest = shelfAlbums.find((item) => item.phase === 'pressed' && availableOnTurntable(item, today));
   const returnFromPlayer = () => {
     if (previewDelivery) {
       setPreviewDelivery(null);
@@ -472,36 +471,13 @@ function App() {
   return <SpotifyPlaybackContext.Provider value={{ ...spotify, openSettings: () => setSheet('settings') }}><div className="desk">
     <aside className="desk-brand" aria-hidden="true"><Icon name="disc" size={26} /><span>BLUE VINYL</span><small>TRAVEL RECORDS</small></aside>
     <div className={'app ' + (page === 'home' ? 'home-app' : '')}>
+      <Boot>
       <main className={'screen ' + page} ref={main}>
-        {page === 'home' && <>
-          <HomeTurntable key={latest?.id || 'empty'} album={latest} open={() => { if (latest) openAlbum(latest); }}>
-            <FlyingAirmail delivery={inbox[0]} paused={sheet === 'inbox'} open={() => { setInboxIndex(0); setSheet('inbox'); }} />
-          </HomeTurntable>
-          <section className="shelf" aria-label="LP 리스트">
-            <button className="empty-sleeve" disabled={!loaded} onClick={() => { setForm(newTrip()); setEditingDetails(false); go('blank'); }}>
-              <span className="spine">+ Add New Album</span><span className="empty-face"><Icon name="plus" size={25} /></span>
-            </button>
-            {shelfAlbums.map((item, index) => <div className="shelf-item" key={item.id}>
-              {!availableOnTurntable(item, today) ? <ParcelShelf album={item} today={today} expanded={preview === item.id}
-                toggle={() => setPreview(preview === item.id ? '' : item.id)} unpack={unpackAlbum} busy={busy} /> : <>
-              <button className={'sleeve sleeve-' + index % 3} aria-expanded={preview === item.id}
-                onClick={() => setPreview(preview === item.id ? '' : item.id)}>
-                <span className="spine"><strong>{albumTitle(item)}</strong><span>{dateLabel(item.start)}</span>{item.phase === 'trip' && <i />}</span>
-                <SleeveFace album={item} />
-                {item.shared && <SharedTag />}
-              </button>
-              {preview === item.id && <PullSleeve album={item} open={() => openAlbum(item)} />}
-              </>}
-            </div>)}
-          </section>
-          <div className="home-foot">
-            <button className="home-settings" aria-label="설정" disabled={!loaded} onClick={() => { setNotice(''); setSheet('settings'); }}><Icon name="settings" size={19} /></button>
-            <div className="home-foot-actions">
-              <button onClick={() => go('map')}><Icon name="pin" size={13} /> 여행 지도</button>
-            </div>
-          </div>
-          {spotify.error && <p className="home-spotify-error error" role="status">{spotify.error}</p>}
-        </>}
+        {page === 'home' && <HomeScene albums={shelfAlbums} latest={latest} openAlbum={openAlbum}
+          delivery={inbox[0]} inboxOpen={sheet === 'inbox'} openInbox={() => { setInboxIndex(0); setSheet('inbox'); }}
+          preview={preview} setPreview={setPreview} today={today} unpack={unpackAlbum} busy={busy} loaded={loaded}
+          create={() => { setForm(newTrip()); setEditingDetails(false); go('blank'); }}
+          settings={() => { setNotice(''); setSheet('settings'); }} error={spotify.error} />}
 
         {page === 'blank' && <NewAlbum form={form} update={(patch) => setForm((value) => ({ ...value, ...patch }))}
           save={createTrip} busy={busy} back={goHome} complete={() => go('draft-disc')} />}
@@ -567,6 +543,7 @@ function App() {
         {page === 'shipping' && album?.delivery && <LazyScreen back={goHome}><ShippingScreen album={album} busy={busy} save={saveDelivery} /></LazyScreen>}
         {page === 'map' && <LazyScreen back={goHome}><TravelMap albums={shelfAlbums.filter((item) => item.phase === 'pressed')} back={goHome} open={openAlbum} /></LazyScreen>}
       </main>
+      </Boot>
 
       {sheet === 'inbox' && inbox.length > 0 && <Inbox items={inbox} index={inboxIndex} onIndex={setInboxIndex} close={() => setSheet('')}
         play={playDelivery} save={(delivery) => finishDelivery(delivery, true)}

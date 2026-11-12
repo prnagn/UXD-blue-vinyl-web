@@ -1,0 +1,46 @@
+.screen.home{padding:0;overflow:hidden;background:#545e85;display:block}
+.home-scene{position:relative;height:100%;overflow:hidden;background:#545e85;isolation:isolate;touch-action:none}
+.home-scene::before{content:"";position:absolute;inset:0;background:linear-gradient(#545e85,#14161f);opacity:0;transition:opacity .9s;pointer-events:none}
+.home-view-stack::before,.home-view-cover::before{opacity:1}
+.home-turntable-scene{position:absolute;inset:0;transition:transform .95s cubic-bezier(.25,.8,.25,1) .12s,opacity .6s ease .12s}
+.home-view-stack .home-turntable-scene,.home-view-cover .home-turntable-scene{transform:translateY(-112%);opacity:0;transition:transform .9s cubic-bezier(.3,.7,.2,1),opacity .7s}
+.home-scene .turntable{height:56%;min-height:calc(var(--app-width)*1.12);overflow:visible}
+.home-scene .latest-disc{clip-path:circle(calc(var(--app-width)*.69837) at 18.75% calc(var(--app-width)*.27174))}
+.home-scene .latest-disc .vinyl{left:-51.087%;top:calc(var(--app-width)*-.42663);width:139.674%;background:radial-gradient(circle,#2a2a2e 0 36%,#232326 36.5%);box-shadow:0 20px 50px #0005}
+.home-scene .latest-disc .vinyl::before{background:conic-gradient(from 0deg,transparent 0 40deg,#ffffff0d 60deg,transparent 80deg 220deg,#ffffff0a 240deg,transparent 260deg)}
+.home-scene .latest-disc .vinyl-label{width:34.63%;box-shadow:none}
+.home-scene .home-arm{right:auto;left:-3.26%;top:0;width:106.79%;aspect-ratio:393/260;transform-origin:95.93% -7.69%;filter:drop-shadow(0 6px 8px #0005);transition:transform 1.4s cubic-bezier(.45,0,.2,1)}
+.home-scene .home-arm.dragging{transition:none}
+.home-scene .turntable-label{top:calc(var(--app-width)*.9402);bottom:auto;left:8.967%;width:82.066%;text-align:right;gap:3px}
+.home-scene .turntable-label strong{font-size:19px;letter-spacing:-.2px}
+.home-scene .turntable-label time{font-size:12px;opacity:.78}
+.home-scene .turntable-label small{font-size:10px}
+.home-scene .home-spotify-player{position:absolute;left:9%;right:9%;top:49%;margin:0;z-index:4}
+.airmail-flight-zone{inset:0;z-index:8;overflow:hidden;pointer-events:none}
+.airmail-flight{left:0;top:0;width:calc(var(--app-width)*.16304);height:calc(var(--app-width)*.16304);padding:0;border:0;border-radius:0;background:none;visibility:hidden;animation:none;offset-path:none;filter:drop-shadow(3px 6px 5px #0005);pointer-events:auto}
+.airmail-flight.is-flying{visibility:visible}
+.home-view-stack .airmail-flight,.home-view-cover .airmail-flight{visibility:hidden}
+.airmail-flight img{width:100%;height:100%;pointer-events:none}
+.home-shelf{position:absolute;inset:0 0 65px;z-index:3;overflow:hidden;scrollbar-width:none;pointer-events:none}
+.home-view-stack .home-shelf{overflow-y:auto;overscroll-behavior:contain}
+.home-shelf-content{position:relative;pointer-events:none}
+.home-slab{position:absolute;left:8.967%;width:82.066%;height:calc(var(--slab-height) + 12px);pointer-events:auto;transition:top .75s cubic-bezier(.22,.9,.28,1) var(--stagger),opacity .4s}
+.home-slab .spine{height:12px;min-height:12px;padding:0 7px;background:#d9d9db;border-radius:0;box-shadow:0 1px 1.5px #0005;font-size:8.2px;line-height:12px;gap:6px}
+.home-slab .spine strong,.home-slab .empty-sleeve .spine{font-weight:600}
+.home-slab .spine>span{font-size:8.2px;font-weight:400}
+.home-slab .empty-face,.home-slab .sleeve-face,.home-slab .parcel-shelf-face{height:var(--slab-height);clip-path:polygon(0 0,100% 0,96.5% 100%,3.5% 100%);transition:height .75s cubic-bezier(.22,.9,.28,1),clip-path .75s}
+.home-slab .empty-face{background:#68739158}
+.home-slab.slab-up>.sleeve{display:flex;flex-direction:column}
+.home-slab.slab-up>.sleeve>.spine{order:2;width:100%}
+.home-slab.slab-up>.sleeve>.sleeve-face{order:1;width:100%;clip-path:polygon(3.5% 0,96.5% 0,100% 100%,0 100%)}
+.home-slab .shared-tag{top:45%;font-size:7px}
+.home-slab.slab-selected{z-index:10}
+.home-slab.slab-selected>.sleeve{visibility:hidden}
+.home-slab .pull-wrap{position:absolute;inset:0;padding:0;animation:home-cover-rise .8s cubic-bezier(.2,.8,.2,1) both}
+.home-slab .pull-caption{font-size:19px;gap:8px}
+.home-slab .parcel-preview{position:absolute;top:0;left:0;right:0}
+.home-slab:has(.parcel-preview) .parcel-sleeve{visibility:hidden}
+.home-scene .home-foot{position:absolute;left:8.967%;right:8.967%;bottom:max(18px,env(safe-area-inset-bottom));z-index:12;margin:0;padding:0;min-height:42px;pointer-events:none}
+.home-scene .home-foot button{pointer-events:auto;width:44px;justify-content:center}
+.home-scene .home-spotify-error{position:absolute;bottom:65px;left:9%;right:9%;margin:0;z-index:5}
+@keyframes home-cover-rise{from{opacity:0;transform:perspective(900px) rotateX(78deg) scaleY(.25)}to{opacity:1;transform:perspective(900px) rotateX(0) scaleY(1)}}

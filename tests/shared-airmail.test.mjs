@@ -55,6 +55,13 @@ export async function testSharedAirmail(archive) {
     const shelf = archive.visibleShelfAlbums(saved);
     assert.equal(saved.length, 3, 'hiding demo records must not delete any stored album');
     assert.deepEqual(shelf.map(album => album.id), [kept.id, 'own'], 'a received album must appear first, above user records, while old demos stay hidden');
+    const arrivalsByDay = archive.visibleShelfAlbums([
+      { id: 'older-delivery', start: '2026-11-12', shelfAddedAt: Date.parse('2026-11-12'), delivery: { arrivesOn: '2026-11-13', unpackedAt: '2026-11-20' } },
+      { id: 'latest-delivery', start: '2025-01-01', shelfAddedAt: 1, delivery: { arrivesOn: '2026-11-15' } },
+      { id: 'shared', shared: true, start: '2024-09-01', shelfAddedAt: new Date(2026, 10, 14, 12).getTime() },
+      { id: 'hidden-demo', demo: true, delivery: { arrivesOn: '2027-01-01' } },
+    ]);
+    assert.deepEqual(arrivalsByDay.map(album => album.id), ['latest-delivery', 'shared', 'older-delivery'], 'sort by delivery date, not travel date, creation date or late unwrapping; shared albums use their local shelf receipt date');
     await archive.resetArchive();
     await archive.ensureWelcomeDelivery();
     const again = await archive.loadInbox();

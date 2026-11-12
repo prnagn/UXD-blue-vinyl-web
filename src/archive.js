@@ -122,8 +122,16 @@ export function sharedAlbum(delivery, addedAt = Date.now()) {
 }
 
 export function visibleShelfAlbums(records) {
+  const receivedDay = (album) => {
+    // A delivered parcel keeps its actual arrival date, even if opened later.
+    const date = album.delivery?.arrivesOn;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return date;
+    const timestamp = album.receivedAt || album.shelfAddedAt || album.completedAt;
+    if (timestamp && Number.isFinite(new Date(timestamp).getTime())) return localDay(new Date(timestamp));
+    return album.end || album.start || '';
+  };
   return records.filter((album) => !album.demo || album.shared)
-    .sort((a, b) => (b.shelfAddedAt || 0) - (a.shelfAddedAt || 0) || (b.start || '').localeCompare(a.start || ''));
+    .sort((a, b) => receivedDay(b).localeCompare(receivedDay(a)) || (b.shelfAddedAt || 0) - (a.shelfAddedAt || 0));
 }
 
 async function writeStores(stores, write) {

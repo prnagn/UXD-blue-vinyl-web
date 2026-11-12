@@ -10,6 +10,21 @@ import { testSharedAirmail } from './shared-airmail.test.mjs';
 import { playbackDays, dayPosition, trackAtPosition } from '../src/playback-days.js';
 import { centeredScroll, reorderPosition, reorderSpacing } from '../src/carousel-layout.js';
 import { availableOnTurntable, parcelState } from '../src/parcel-state.js';
+import { homeLayout } from '../src/home-layout.js';
+import { airmailFrames } from '../src/airmail-flight.js';
+
+for (const [width, height] of [[280, 600], [390, 844], [432, 932]]) {
+  const home = homeLayout(16, height, 'home', -1, width);
+  const stack = homeLayout(16, height, 'stack', -1, width);
+  assert(home[0].top > height * .5 && stack[0].top < height * .1, 'scrolling must move the shelf from beneath the LP to the top');
+  assert(stack.every((slot, index) => !index || slot.top > stack[index - 1].top + stack[index - 1].height + 12), 'a long user collection must retain distinct shelf slots');
+  assert(stack.some(slot => slot.up) && stack.some(slot => !slot.up), 'shelf faces must change perspective around eye level');
+  for (const direction of [0, .9]) {
+    const frames = airmailFrames(width, () => direction);
+    const x = frame => Number(frame.transform.match(/translate\(([-\d.]+)px/)[1]);
+    assert(direction === 0 ? x(frames[0]) < 0 && x(frames.at(-1)) > width : x(frames[0]) > width && x(frames.at(-1)) < 0, 'planes must cross the entire responsive viewport in either direction');
+  }
+}
 
 const parcelAlbum = { id: 'parcel', name: 'Journey', city: 'Daejeon', country: 'Korea', start: '2026-11-12', entries: [], phase: 'pressed',
   delivery: { dispatchedOn: '2026-11-12', arrivesOn: '2026-11-15', destination: 'Seoul' } };
@@ -182,6 +197,13 @@ try {
   const { FlyingAirmail } = await server.ssrLoadModule('/src/flying-airmail.jsx');
   const { welcomeParisDelivery } = await server.ssrLoadModule('/src/archive.js');
   const welcome = welcomeParisDelivery();
+  const { HomeScene } = await server.ssrLoadModule('/src/home-scene.jsx');
+  const homeScene = renderToStaticMarkup(React.createElement(HomeScene, { albums: [], loaded: true, delivery: welcome }));
+  assert(homeScene.includes('Add New Album') && homeScene.includes('aria-label="설정"') && homeScene.includes('art/yuna-plane.png'));
+  assert(!homeScene.includes('여행 지도') && !homeScene.includes('Jeju'), 'the home screen must hide map navigation and dummy shelf albums');
+  const { default: Boot } = await server.ssrLoadModule('/src/boot.jsx');
+  const boot = renderToStaticMarkup(React.createElement(Boot));
+  assert(boot.includes('Blue Vinyl 열기') && boot.includes('img/bv-icon.png'), 'entry must use the copied Yuna app icon and launcher');
   assert.equal(renderToStaticMarkup(React.createElement(FlyingAirmail, {})), '', 'no received LP must mean no plane');
   assert(renderToStaticMarkup(React.createElement(FlyingAirmail, { delivery: welcome })).includes('airmail-flight'));
   const { Inbox } = await server.ssrLoadModule('/src/inbox.jsx');

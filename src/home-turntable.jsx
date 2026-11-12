@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { albumArt, albumPlaybackTracks } from './archive';
-import { albumTitle, Arm, useMedia, Vinyl } from './ui';
+import { albumTitle, dateLabel, useMedia, Vinyl } from './ui';
 import { SpotifyPlayer } from './spotify-player';
 
-const parked = -25;
+const parked = -16;
 const overRecord = 0;
-const playBoundary = -12;
+const playBoundary = -11;
 
-export function HomeTurntable({ album, open, children }) {
+export function HomeTurntable({ album, open, children, active = true }) {
   const tracks = albumPlaybackTracks(album?.entries || []);
   const track = tracks.find((entry) => entry.kind === 'spotify') || tracks.find((entry) => entry.kind === 'audio' || entry.kind === 'video');
   const isSpotify = track?.kind === 'spotify';
@@ -26,6 +26,7 @@ export function HomeTurntable({ album, open, children }) {
     const media = ambient.current;
     return () => media?.pause();
   }, [track?.id]);
+  useEffect(() => { if (!active) stopPlayback(); }, [active]);
 
   async function startPlayback() {
     if (wantsPlayback.current) return;
@@ -76,6 +77,10 @@ export function HomeTurntable({ album, open, children }) {
     pointer.current = null;
     setDragAngle(null);
     if (!release) return;
+    if (Math.abs(event.clientX - active.x) < 4) {
+      if (wantsPlayback.current) stopPlayback(); else startPlayback();
+      return;
+    }
     if (pointerAngle(event, active) >= playBoundary) startPlayback();
     else stopPlayback();
   }
@@ -97,10 +102,19 @@ export function HomeTurntable({ album, open, children }) {
       onClick={(event) => {
         if (event.detail === 0) { if (wantsPlayback.current) stopPlayback(); else startPlayback(); }
       }}>
-      <Arm />
+      <svg className="arm" viewBox="0 0 393 260" aria-hidden="true">
+        <g transform="translate(413 -147)">
+          <path d="M-133 318 13 22" stroke="transparent" strokeWidth="50" strokeLinecap="round" fill="none" />
+          <rect x="-182" y="139.5" width="274" height="13" fill="#959595" transform="rotate(-65 -45 146)" />
+          <rect x="-115" y="269.5" width="16" height="15" fill="#d9d9d9" transform="rotate(-65 -107 277)" />
+          <rect x="-129.9" y="285.9" width="29.8" height="18.2" rx="9" fill="#d9d9d9" transform="rotate(-64.5 -115 295)" />
+          <rect x="-163" y="304" width="60" height="28" rx="10" fill="#d9d9d9" transform="rotate(-35 -133 318)" />
+        </g>
+      </svg>
     </button>
     {album && <div className="turntable-label">
       <strong>{title}</strong>
+      <time>{dateLabel(album.start)}</time>
       {(notice || track) && <small role="status">{notice || track.name || '현장의 소리'}</small>}
     </div>}
     {children}
