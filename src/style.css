@@ -250,7 +250,8 @@ p,h1,h2,blockquote{margin:0}
 .focus-media video{display:block;width:100%;max-height:52dvh}
 .focus-media .media-photo{margin-top:6px}
 .focus-media .memo-view{padding:8px 5px}
-.home{background:linear-gradient(180deg,#535d81 0%,#535d81 66%,#454e70 100%)}
+.home{display:flex;flex-direction:column;background:linear-gradient(180deg,#535d81 0%,#535d81 66%,#454e70 100%)}
+.home>.turntable,.home>.shelf,.home>.home-spotify-player,.home>.home-foot{flex-shrink:0}
 .turntable{height:clamp(295px,64.2dvh,555px);position:relative;overflow:hidden}
 .latest-disc{position:absolute;z-index:1;top:0;left:0;width:100%;height:100%;padding:0;border:0;background:transparent;overflow:hidden;text-align:left;clip-path:circle(calc(var(--app-width)*.7) at 19% calc(var(--app-width)*.27))}
 .latest-disc:focus-visible .vinyl-label{outline:3px solid #fff;outline-offset:6px}
@@ -292,6 +293,7 @@ p,h1,h2,blockquote{margin:0}
 .sleeve:hover .sleeve-face,.sleeve[aria-expanded=true] .sleeve-face,.empty-sleeve:hover .empty-face{filter:brightness(1.14)}
 .sleeve[aria-expanded=true] .sleeve-face{height:12px}
 .home-foot{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:space-between;margin:23px 9.1% 0;color:#eeeff9a3;font-size:8px;letter-spacing:.2em}
+.home>.home-foot{order:1;margin-top:auto;padding-top:23px}
 .home-foot-actions{display:flex;gap:15px}
 .home-spotify-error{margin:4px 9.1% 0;font-size:11px}
 .home-foot span{align-self:center}
