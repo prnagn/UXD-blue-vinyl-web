@@ -46,10 +46,14 @@ export async function prepareSpotifyCapture(request, { cancelled = () => false, 
       try {
         const now = await request('/me/player');
         // Do not take over a different device or a song the user selected during recording.
-        if (now?.device?.id && now.device.id !== device.id) return '';
+        if (now?.device?.id && now.device.id !== device.id) {
+          if (changedVolume) { try { await setVolume(volume); } catch { /* The old device may already be offline. */ } }
+          return '';
+        }
         const sameSong = !now?.item || now.item.id === track.id;
-        const untouchedVolume = !now?.device || now.device.volume_percent === lastVolume;
-        if (paused && sameSong && !now?.is_playing) await request('/me/player/play' + target, { method: 'PUT' });
+        const untouchedVolume = !now?.device || now.device.volume_percent === lastVolume || now.device.volume_percent === volume;
+        // Spotify can briefly report its pre-pause state. Resuming the same context is idempotent.
+        if (paused && sameSong) await request('/me/player/play' + target, { method: 'PUT' });
         if (changedVolume && untouchedVolume) {
           if (canFade && sameSong) {
             const fromVolume = lastVolume;

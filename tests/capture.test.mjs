@@ -48,6 +48,14 @@ function client(initial = original()) {
   assert(api.calls.some(call => call.path.includes('/pause')) && api.calls.some(call => call.path.includes('/play?')));
 }
 {
+  const api = client(); let cached = false;
+  const capture = await prepareSpotifyCapture((path, options) => cached && path === '/me/player' ? Promise.resolve(original()) : api.request(path, options), { sleep: async () => {} });
+  cached = true;
+  await capture.restore();
+  assert.equal(api.state.is_playing, true, 'a stale pre-pause API snapshot must not suppress resume');
+  assert.equal(api.state.device.volume_percent, 90, 'stale volume metadata must not leave the phone muted');
+}
+{
   const state = original(); state.is_playing = false;
   const api = client(state);
   const capture = await prepareSpotifyCapture(api.request);
@@ -81,6 +89,14 @@ function client(initial = original()) {
   assert.equal(await opening, null);
   assert.equal(opened, 0, 'quick release must not open a delayed microphone');
   assert.equal(active.spotify.id, id);
+}
+{
+  const api = client();
+  const capture = await prepareSpotifyCapture(api.request, { sleep: async () => {} });
+  api.state.device.id = 'other-speaker';
+  await capture.restore();
+  assert(!api.calls.some(call => call.path.includes('/play?')), 'never resume a different Spotify device');
+  assert(api.calls.filter(call => call.path.includes('/volume')).every(call => call.path.includes('device_id=phone')));
 }
 {
   let resolveStream; let stopped = 0;

@@ -116,19 +116,6 @@ export function useSpotify(enabled) {
     return { ...prepared, restore: () => serial(prepared.restore) };
   }
 
-  async function captureTrack() {
-    if (!tokenRef.current) return null;
-    try {
-      const request = (access) => fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-        headers: { Authorization: 'Bearer ' + access }, signal: AbortSignal.timeout(4000),
-      });
-      let response = await request(await accessToken());
-      if (response.status === 401) response = await request(await accessToken(true));
-      if (response.status === 204 || !response.ok || !tokenRef.current) return null;
-      return playingTrack(await response.json());
-    } catch { return null; }
-  }
-
   async function connect(albumId) {
     setError('');
     if (!['http:', 'https:'].includes(location.protocol) || !crypto.subtle) {
@@ -218,6 +205,6 @@ export function useSpotify(enabled) {
 
   const granted = new Set((token?.scope || '').split(' '));
   return { track, connected: Boolean(token), needsReconnect: Boolean(token) && !scopes.every((scope) => granted.has(scope)),
-    connecting, error, connect, disconnect, resumeAlbumId, captureTrack, prepareRecording,
+    connecting, error, connect, disconnect, resumeAlbumId, prepareRecording,
     getPlayback: () => request('/me/player'), playSong, pauseSong };
 }

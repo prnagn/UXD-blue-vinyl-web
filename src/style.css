@@ -231,10 +231,6 @@ p,h1,h2,blockquote{margin:0}
 .moment-transport{display:flex;justify-content:center;align-items:center;gap:12px}
 .moment-segment-play{min-height:44px;display:flex;align-items:center;justify-content:center;gap:8px;min-width:145px;background:none;border:0;padding:5px 8px;color:#fff;font-size:12px}
 .moment-segment-count{font-size:10px;letter-spacing:.12em;color:var(--muted);margin:0 0 5px}
-.moment-spotify iframe{display:block;border-radius:12px;border:0}
-.spotify-loading{height:152px;border-radius:12px;background:#202020;color:#f1f1ec;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-size:13px}
-.spotify-loading small{font-size:10px;color:#bcbdbb}
-.moment-spotify a{display:inline-block;margin:8px 0;color:var(--muted);font-size:11px;text-underline-offset:3px}
 .focus-bottom{position:relative;z-index:3;text-align:center;padding:5px 24px max(14px,env(safe-area-inset-bottom));background:linear-gradient(transparent,#535d81 17%);overflow:hidden}
 .focus-bottom h1{font-size:clamp(18px,5vw,26px);color:#f1f0ec;text-wrap:balance}
 .focus-spotify{max-width:360px;margin:8px auto 0}
