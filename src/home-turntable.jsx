@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { albumArt, albumPlaybackTracks } from './archive';
 import { albumTitle, Arm, useMedia, Vinyl } from './ui';
 import { SpotifyPlayer } from './spotify-player';
@@ -8,31 +8,48 @@ const overRecord = 0;
 const playBoundary = -12;
 
 export function HomeTurntable({ album, open, children }) {
-  const track = albumPlaybackTracks(album.entries).find((entry) => entry.kind === 'spotify');
+  const tracks = albumPlaybackTracks(album.entries);
+  const track = tracks.find((entry) => entry.kind === 'spotify') || tracks.find((entry) => entry.kind === 'audio' || entry.kind === 'video');
+  const isSpotify = track?.kind === 'spotify';
+  const source = useMedia(track);
   const [playing, setPlaying] = useState(false);
   const [dragAngle, setDragAngle] = useState(null);
   const [notice, setNotice] = useState('');
   const controller = useRef(null);
+  const ambient = useRef(null);
   const wantsPlayback = useRef(false);
   const pointer = useRef(null);
   const art = useMedia(albumArt(album));
   const angle = dragAngle ?? (playing ? overRecord : parked);
   const title = albumTitle(album);
+  useEffect(() => {
+    const media = ambient.current;
+    return () => media?.pause();
+  }, [track?.id]);
 
-  function startPlayback() {
+  async function startPlayback() {
     if (wantsPlayback.current) return;
     if (!track) {
-      setNotice('이 LP에는 저장된 Spotify 곡이 없어요.');
+      setNotice('이 LP에는 재생할 소리가 없어요.');
       return;
     }
     setNotice('');
     wantsPlayback.current = true;
-    controller.current?.resume();
+    if (isSpotify) controller.current?.resume();
+    else {
+      try { await ambient.current?.play(); }
+      catch {
+        wantsPlayback.current = false;
+        setPlaying(false);
+        setNotice('현장음을 재생할 수 없어요.');
+      }
+    }
   }
 
   function stopPlayback() {
     wantsPlayback.current = false;
     controller.current?.pause();
+    ambient.current?.pause();
     setPlaying(false);
   }
 
@@ -74,7 +91,7 @@ export function HomeTurntable({ album, open, children }) {
     <button className={'home-arm' + (dragAngle !== null ? ' dragging' : '')}
       style={{ '--arm-angle': angle + 'deg' }}
       aria-label="톤암 · LP 재생 또는 정지" aria-pressed={playing}
-      aria-description="톤암을 판 위로 끌어 Spotify 곡을 재생하고, 오른쪽으로 빼서 정지하세요."
+      aria-description="톤암을 판 위로 끌어 재생하고, 오른쪽으로 빼서 정지하세요."
       onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={(event) => finishDrag(event, true)}
       onPointerCancel={finishDrag} onLostPointerCapture={finishDrag}
       onClick={(event) => {
@@ -84,14 +101,18 @@ export function HomeTurntable({ album, open, children }) {
     </button>
     <div className="turntable-label">
       <strong>{title}</strong>
-      {(notice || track) && <small role="status">{notice || track.name}</small>}
+      {(notice || track) && <small role="status">{notice || track.name || '현장의 소리'}</small>}
     </div>
     {children}
   </section>
-    {track && <div className="home-spotify-player" aria-label="LP에 기록된 Spotify 곡">
+    {isSpotify && <div className="home-spotify-player" aria-label="LP에 기록된 Spotify 곡">
       <SpotifyPlayer key={track.id} song={track.spotify} controllerRef={controller}
         onPlaying={(value) => { wantsPlayback.current = value; setPlaying(value); }}
         onReady={(player) => { if (wantsPlayback.current) player.resume(); }} />
     </div>}
+    {track && !isSpotify && <audio ref={ambient} src={source} preload="metadata"
+      onPlay={(event) => { if (wantsPlayback.current) setPlaying(true); else event.currentTarget.pause(); }}
+      onPause={() => setPlaying(false)} onEnded={stopPlayback}
+      onError={() => { stopPlayback(); setNotice('현장음을 재생할 수 없어요.'); }} />}
   </>;
 }

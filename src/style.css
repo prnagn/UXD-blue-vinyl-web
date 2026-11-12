@@ -180,6 +180,7 @@ p,h1,h2,blockquote{margin:0}
 .focus-arm{width:57%;position:absolute;z-index:3;right:1.3%;top:50%;padding:0;border:0;background:none;transform:translateY(-57%) rotate(var(--focus-arm-angle,-35deg));transform-origin:77.536% 15.254%;filter:drop-shadow(2px 4px 2px #21283945);touch-action:none;user-select:none;pointer-events:none;transition:transform .35s ease,width .4s ease,right .4s ease}
 .focus-arm svg{display:block;width:100%;height:auto;overflow:visible;pointer-events:visiblePainted}
 .focus-arm.dragging{transition:none;cursor:grabbing}
+.focus-arm{filter:drop-shadow(1px 2px 1px #21283920)}
 .capture-disc::after{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 25deg,transparent 0deg,#ffffff05 45deg,transparent 90deg,transparent 180deg,#ffffff05 225deg,transparent 270deg);animation:spin 9s linear infinite;animation-play-state:paused}
 .phase-holding .capture-disc::after{animation-play-state:running}
 .zoom-gesture{touch-action:pan-y}
@@ -261,6 +262,8 @@ p,h1,h2,blockquote{margin:0}
 .home-arm.dragging{cursor:grabbing;transition:none}
 .home-arm .arm{position:static;display:block;width:100%;height:auto}
 .home-arm:focus-visible .arm{filter:drop-shadow(0 0 4px #fff)}
+.home-arm{clip-path:none;pointer-events:none}
+.home-arm .arm{overflow:visible;pointer-events:visiblePainted}
 .turntable-label{position:absolute;z-index:1;left:9.1%;bottom:7%;width:52%;display:grid;gap:4px;pointer-events:none}
 .turntable-label strong,.turntable-label small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .turntable-label strong{font:600 16px var(--serif);color:var(--paper)}
@@ -487,6 +490,59 @@ button.shipping-location{min-height:30px;border:0;background:none;text-decoratio
 @keyframes airmail-arrival{from{opacity:0;transform:translate(145%,-120%) rotate(-24deg)}to{opacity:1;transform:translate(0,0) rotate(0)}}
 @keyframes delivery-open{from{opacity:0;transform:translateY(13px) scale(.86) rotate(-6deg)}to{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
 @keyframes delivery-disc{from{opacity:.3;transform:translate(-24%,-14%) rotate(-30deg) scale(.82)}to{opacity:1;transform:translate(0,0) rotate(0) scale(1)}}
+.new-album{height:100%;min-height:340px;position:relative;overflow:hidden;isolation:isolate}
+.new-album-disc{position:absolute;width:46%;left:50%;top:37%;transform:rotate(250deg);transition:opacity .5s,transform .65s,left .65s;z-index:1}
+.new-album-disc .vinyl{background:#232326;box-shadow:none}
+.new-album-disc .vinyl::before{display:none}
+.new-album-cover{position:absolute;z-index:2;left:6%;top:37%;width:44%;height:calc(var(--app-width)*.44);border-radius:3px;background:linear-gradient(150deg,#a2a7bd,#6c7494);box-shadow:0 14px 24px #17213a30;transform:rotate(-4deg);transform-origin:center;transition:width .65s cubic-bezier(.4,0,.2,1),height .65s cubic-bezier(.4,0,.2,1),left .65s,top .65s,transform .65s,border-radius .65s}
+.new-album-intro .new-album-cover{animation:new-jacket-arrive 1.8s ease both}
+.new-album-intro .new-album-disc{animation:new-vinyl-arrive 1.8s ease both}
+.new-album-title{position:absolute;inset:auto 8% 9%;display:grid;gap:6px;text-align:left}
+.new-album-title b{font:700 clamp(14px,4.3vw,20px) var(--serif);overflow-wrap:anywhere}
+.new-album-title small,.details-jacket small{font-size:8px;letter-spacing:.13em;font-weight:650;opacity:.75}
+.new-album-back{position:absolute;z-index:4;top:calc(12px + env(safe-area-inset-top));left:15px}
+.new-album-form .new-album-cover{left:0;top:0;width:100%;height:100%;border-radius:0;transform:rotate(0);overflow-y:auto;box-shadow:none}
+.new-album-form .new-album-disc{left:76%;opacity:0;transform:rotate(300deg) scale(.8)}
+.new-album-form .new-album-title{display:none}
+.new-album-form .trip-details{animation:new-details-in .4s .48s both}
+.details-jacket{width:31%;aspect-ratio:1;margin:clamp(8px,2dvh,18px) auto 25px;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;gap:5px;background:linear-gradient(145deg,#a2a7bd,#69728f);box-shadow:0 7px 15px #20294524}
+.details-jacket b{font:700 14px var(--serif);overflow-wrap:anywhere}
+.details-jacket small{font-size:6px}
+.new-album-leaving .new-album-cover{animation:new-jacket-leave 1.6s cubic-bezier(.45,0,.2,1) both}
+.new-album-leaving .new-album-disc{animation:new-vinyl-open 1.6s cubic-bezier(.45,0,.2,1) both}
+@keyframes new-jacket-arrive{0%{opacity:0;transform:translate(46%,30px) scale(.75) rotate(0)}25%{opacity:1;transform:translate(46%,0) scale(1) rotate(0)}45%{transform:translate(46%,0) rotate(0)}85%,100%{opacity:1;transform:rotate(-4deg)}}
+@keyframes new-vinyl-arrive{0%,35%{opacity:0;transform:translateX(-60%) rotate(0)}40%{opacity:1}90%,100%{opacity:1;transform:translateX(0) rotate(250deg)}}
+@keyframes new-details-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes new-jacket-leave{0%{left:0;top:0;width:100%;height:100%;transform:rotate(0);opacity:1}35%{left:6%;top:37%;width:44%;height:calc(var(--app-width)*.44);transform:rotate(-4deg);opacity:1}65%,100%{left:-60%;top:37%;width:44%;height:calc(var(--app-width)*.44);transform:rotate(-16deg);opacity:0}}
+@keyframes new-vinyl-open{0%{opacity:0;width:40%;left:76%;top:37%;transform:rotate(250deg)}30%{opacity:1;width:46%;left:50%;top:37%;transform:rotate(290deg)}45%{width:46%;left:50%;top:37%;transform:rotate(340deg)}100%{opacity:1;width:165%;left:-73.5%;top:clamp(62px,9dvh,88px);transform:rotate(520deg)}}
+.focus-stage{min-height:clamp(220px,44dvh,460px)}
+.focus-day-meta{text-align:right;display:grid;gap:3px;margin:0 2px 7px;min-height:57px}
+.focus-day-meta h1{font-weight:700;font-size:clamp(19px,5.5vw,25px)}
+.focus-day-meta>span{font-size:12px;color:#f3f1edf0}
+.focus-day-meta>span:last-child{color:#e0e1ecb8}
+.day-timeline{position:relative;height:44px;margin:3px 21px 0;touch-action:none;cursor:ew-resize;outline-offset:2px}
+.day-line{position:absolute;left:0;right:0;top:21px;height:3px;background:radial-gradient(circle,#cdd3e7 1px,transparent 1.6px) left center/7px 3px repeat-x;pointer-events:none}
+.day-line-done{right:auto;background:radial-gradient(circle,#fff 1.3px,transparent 1.7px) left center/7px 3px repeat-x}
+.day-stop,.day-end{position:absolute;z-index:2;top:17px;width:10px;height:10px;transform:translateX(-50%);border:1.5px solid #fff;border-radius:50%;background:#535d81;pointer-events:none}
+.day-stop.seen{background:#9caedc}
+.day-stop:first-of-type{background:#fff}
+.day-end{right:-5px;transform:none}
+.moment-stop{position:absolute;top:20px;width:4px;height:4px;margin-left:-2px;background:#e0e4f4;border-radius:50%;pointer-events:none}
+.day-plane{position:absolute;z-index:3;top:13px;width:24px;transform:translateX(-50%);filter:drop-shadow(0 2px 2px #171a2955);pointer-events:none}
+.day-plane svg{display:block;width:24px;height:18px}
+.day-player-controls{display:flex;align-items:center;justify-content:space-between;padding:0 15px;gap:10px}
+.day-player-controls .icon-button{height:46px;width:46px}
+.day-player-controls .day-play svg{fill:currentColor;stroke-width:1.4}
+.day-player-controls .day-play[aria-pressed=true] svg{fill:none;stroke-width:4}
+.day-song-name{font-size:11px;color:#eeeff6bf;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:6px 0 4px}
+.day-track-list{max-height:205px;overflow:auto;text-align:left;margin-top:10px;padding:5px 10px;border:1px solid #ffffff29;border-radius:15px;background:#303953}
+.day-track-list button{border:0;width:100%;background:none;text-align:left;min-height:43px;padding:8px 6px;display:flex;align-items:center;gap:9px;color:#f7f5ef;font-size:12px}
+.day-track-heading{font-weight:700;border-bottom:1px solid #ffffff20!important}
+.day-track-heading span{margin-left:auto;font-size:10px;font-weight:400;color:#d4d9e7}
+.day-track-list .day-track-item{padding-left:13px;color:#d7dcec}
+.day-track-item span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.day-track-list .day-track-item[aria-current=true]{color:#fff;background:#ffffff16;border-radius:7px}
+@media(prefers-reduced-motion:reduce){.new-album-cover,.new-album-disc,.new-album .trip-details{animation:none!important;transition:none!important}}
 @media(min-width:600px){
   .app{--app-width:min(405px,calc((100dvh - 32px)*.48));height:calc(100dvh - 32px);max-height:850px;border-radius:23px;box-shadow:0 0 0 1px #b7bfda3c,0 25px 70px #101221a3}
   .turntable{height:clamp(265px,59dvh,528px)}

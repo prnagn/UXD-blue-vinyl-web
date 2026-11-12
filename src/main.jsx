@@ -4,6 +4,7 @@ import { addDelivery, albumArt, albumFile, deliverySchedule, demos, importAlbum,
 import { AlbumPlayer } from './album-player';
 import { ArtPicker } from './art-picker';
 import { BlankRecord, TripDetails } from './trip-details';
+import { NewAlbum } from './new-album';
 import { HomeTurntable } from './home-turntable';
 import { JourneyConfirm, PressCompleted, PressRecord } from './press-record';
 import { ReturnMail, ShippingScreen } from './shipping';
@@ -162,7 +163,7 @@ function App() {
     setId(item.id);
     setMomentNote('');
     setTrackId('');
-    go(item.phase === 'pressed' ? 'play' : item.grooves?.length ? 'draft-disc' : 'trip');
+    go(item.phase === 'pressed' ? 'play' : (item.grooves?.length || !item.entries.length) ? 'draft-disc' : 'trip');
   }
 
   async function persist(value, next) {
@@ -184,7 +185,7 @@ function App() {
     }
   }
 
-  async function createTrip(event) {
+  async function createTrip(event, navigate = true) {
     event.preventDefault();
     if (!form.name.trim() || (form.end && form.end < form.start)) {
       setNotice('LP 이름과 일정을 확인해 주세요.');
@@ -198,10 +199,10 @@ function App() {
       return;
     }
     setMomentNote('');
-    await persist({
+    return persist({
       ...details, id: crypto.randomUUID(), entries: [], phase: 'trip',
       color: colors[records.length % colors.length],
-    }, 'trip');
+    }, navigate ? 'draft-disc' : undefined);
   }
 
   async function addEntry(entry) {
@@ -477,7 +478,8 @@ function App() {
           {spotify.error && <p className="home-spotify-error error" role="status">{spotify.error}</p>}
         </>}
 
-        {page === 'blank' && <BlankRecord back={goHome} home={goHome} enter={() => go('create')} />}
+        {page === 'blank' && <NewAlbum form={form} update={(patch) => setForm((value) => ({ ...value, ...patch }))}
+          save={createTrip} busy={busy} back={goHome} complete={() => go('draft-disc')} />}
         {page === 'draft-disc' && album && <BlankRecord enter={editDraftDetails} finish={finishAlbum}
           home={goHome} record={() => go('trip')} grooveCount={album.grooves?.length || 0} engraving={engraving} />}
         {page === 'create' && <TripDetails form={form} update={(patch) => setForm((value) => ({ ...value, ...patch }))}

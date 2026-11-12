@@ -34,7 +34,7 @@ export function BlankRecord({ back, enter, finish, home, record, grooveCount = 0
   </div>;
 }
 
-export function TripDetails({ form, update, save, busy, back }) {
+export function TripDetails({ form, update, save, busy, back, sleeve = false }) {
   const [addingLocation, setAddingLocation] = useState(false);
   const location = [form.city, form.country].filter(Boolean).join(', ');
   return <div className="trip-details">
@@ -42,7 +42,7 @@ export function TripDetails({ form, update, save, busy, back }) {
       <button className="icon-button" onClick={back} aria-label="뒤로"><Icon name="back" /></button>
       <button className="details-save" form="trip-details-form" type="submit" disabled={busy}>Save</button>
     </header>
-    <div className="details-disc"><Vinyl color="#36363a" /></div>
+    {sleeve ? <div className="details-jacket"><b>{form.name || 'New Journey'}</b><small>BLANK LP · SIDE A</small></div> : <div className="details-disc"><Vinyl color="#36363a" /></div>}
     <form id="trip-details-form" className="details-form" onSubmit={save}>
       <label className="lp-name">
         <span>LP Name <small>{form.name.length}/50</small></span>

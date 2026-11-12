@@ -50,12 +50,12 @@ export function Vinyl({ className = '', color, image, playing }) {
 
 export function Arm() {
   return <svg className="arm" viewBox="0 0 146 210" aria-hidden="true">
-    <defs><linearGradient id="metal"><stop stopColor="#92949a"/><stop offset=".48" stopColor="#f3f1e9"/><stop offset="1" stopColor="#8e9096"/></linearGradient></defs>
-    <path d="M139 0L53 143l-9 3" fill="none" stroke="#222534" strokeOpacity=".34" strokeWidth="13" transform="translate(4 3)"/>
-    <path d="M139 0L53 143l-9 3" fill="none" stroke="url(#metal)" strokeWidth="10"/>
-    <path d="M38 132l27 16-27 49-29-17z" fill="#76797e"/>
-    <path d="M38 132l27 16-4 6-27-16z" fill="#a4a6a6"/>
-    <path d="M9 180l29 17 3-5-29-17z" fill="#575961"/>
+    <rect x="116" y="-25" width="46" height="68" rx="23" fill="#d9d9d9" />
+    <circle cx="139" cy="0" r="23" fill="#ececec" />
+    <rect x="126" y="-7" width="27" height="19" rx="4" fill="#d9d9d9" transform="rotate(30 139 0)" />
+    <path d="M139 0 46 157" fill="none" stroke="#959595" strokeWidth="8"/>
+    <path d="m46 153-11 20" fill="none" stroke="#d9d9d9" strokeWidth="13"/>
+    <rect x="13" y="169" width="44" height="19" rx="6" fill="#d9d9d9" transform="rotate(-35 35 178)" />
   </svg>;
 }
 

@@ -2,10 +2,10 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import { SpotifyPlaybackContext } from './spotify-context';
 
 // Control the user's Spotify app; no embedded player or hidden audio iframe.
-export function SpotifyPlayer({ song, onPlaying, controllerRef, onReady }) {
+export function SpotifyPlayer({ song, onPlaying, controllerRef, onReady, onProgress }) {
   const service = useContext(SpotifyPlaybackContext);
-  const current = useRef({ service, onPlaying, onReady });
-  current.current = { service, onPlaying, onReady };
+  const current = useRef({ service, onPlaying, onReady, onProgress });
+  current.current = { service, onPlaying, onReady, onProgress };
   const [error, setError] = useState('');
   useEffect(() => {
     if (!song || !/^[a-zA-Z0-9]{22}$/.test(song.id || '')) return;
@@ -14,6 +14,9 @@ export function SpotifyPlayer({ song, onPlaying, controllerRef, onReady }) {
     let checking = false;
     function report(state) {
       if (active) current.current.onPlaying?.(Boolean(state?.is_playing && state.item?.id === song.id));
+      if (active && state?.item?.id === song.id && state.item.duration_ms > 0) {
+        current.current.onProgress?.(Math.max(0, Math.min(1, state.progress_ms / state.item.duration_ms)));
+      }
     }
     async function refresh() {
       if (!active || checking || document.hidden) return;

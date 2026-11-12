@@ -5,6 +5,21 @@ import { createServer } from 'vite';
 import { startAmbient } from '../src/ambient-audio.js';
 import { parkedAngle, needleRadius, trackRadius, trackAngle } from '../src/replay-geometry.js';
 import './capture.test.mjs';
+import { playbackDays, dayPosition, trackAtPosition } from '../src/playback-days.js';
+
+const dated = [{ day: '2026-11-10' }, { day: '2026-11-10' }, { day: '2026-11-12' }];
+const days = playbackDays(dated, '2026-11-10');
+assert.deepEqual(days.map(day => [day.number, day.indices]), [[1, [0, 1]], [3, [2]]], 'skipped calendar days must retain their travel day number');
+assert.equal(dayPosition(days, 1, .5), .375);
+assert.equal(dayPosition(days, 2, 1), 1);
+assert.equal(trackAtPosition(days, 0), 0);
+assert.equal(trackAtPosition(days, .3), 1);
+assert.equal(trackAtPosition(days, .5), 2);
+assert.equal(trackAtPosition(days, 1), 2);
+assert.equal(trackAtPosition([], .5), -1);
+assert.equal(dayPosition([], 0), 0);
+assert.equal(dayPosition(playbackDays([dated[0]]), 0, .5), .5);
+assert.deepEqual(playbackDays([dated[0], dated[2], dated[1]]).map(day => day.indices), [[0], [1], [2]], 'timeline must not silently reorder saved tracks');
 
 globalThis.FileReader = class {
   async readAsDataURL(blob) {
@@ -99,9 +114,12 @@ try {
   const home = renderToStaticMarkup(React.createElement(HomeTurntable, { album: { ...album, art: { trackId: p1.id } } }));
   assert(home.includes('open.spotify.com/track/' + song.id) && home.includes('Saved Song') && !home.includes('<iframe'), 'home playback must select Spotify without an embedded player');
   assert(!home.includes('<audio'), 'home must never fall back to environmental recordings');
-  assert(/class="vinyl\s+rotating"[^>]*>[\s\S]*?<img src="\/one.jpg"/.test(home), 'the cover photo must stay inside the rotating LP');
+  assert(home.includes('class="vinyl ') && home.includes('<img src="/one.jpg"') && !home.includes('rotating'), 'paused home LP and its photo must remain still until playback starts');
   const noSongHome = renderToStaticMarkup(React.createElement(HomeTurntable, { album: { ...album, entries: [p2, a2] } }));
-  assert(!noSongHome.includes('<audio') && !noSongHome.includes('<iframe'), 'an album without Spotify metadata must not invent a song');
+  assert(noSongHome.includes('<audio') && !noSongHome.includes('<iframe') && noSongHome.includes('현장의 소리'), 'an album without Spotify must fall back to its saved field recording');
+  const silentHome = renderToStaticMarkup(React.createElement(HomeTurntable, { album: { ...album, entries: [p2] } }));
+  assert(!silentHome.includes('<audio') && !silentHome.includes('open.spotify.com'), 'a photo-only album must not invent audio');
+  assert(first.includes('day-timeline') && first.includes('day-plane') && first.includes('Day 1'), 'replay must render a day timeline and paper airplane');
   const { MomentMap } = await server.ssrLoadModule('/src/moment-map.jsx');
   const map = renderToStaticMarkup(React.createElement(MomentMap, { album, tracks: album.entries }));
   assert.equal((map.match(/class="moment-pin"/g) || []).length, 3, 'field recordings and song-only moments must get pins');
