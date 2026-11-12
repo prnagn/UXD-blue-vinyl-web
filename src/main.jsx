@@ -34,6 +34,7 @@ function App() {
   const [form, setForm] = useState(newTrip);
   const [editingDetails, setEditingDetails] = useState(false);
   const [engraving, setEngraving] = useState(false);
+  const [draftEntering, setDraftEntering] = useState(false);
   const [reviewFrom, setReviewFrom] = useState('trip');
   const [pressFrom, setPressFrom] = useState('review');
   const [preview, setPreview] = useState('');
@@ -146,6 +147,7 @@ function App() {
     setSheet('');
     setPlaying(false);
     setEngraving(false);
+    setDraftEntering(false);
     setPage(next);
   }, []);
   const showShipping = useCallback(() => go('shipping'), [go]);
@@ -163,7 +165,9 @@ function App() {
     setId(item.id);
     setMomentNote('');
     setTrackId('');
-    go(item.phase === 'pressed' ? 'play' : (item.grooves?.length || !item.entries.length) ? 'draft-disc' : 'trip');
+    const next = item.phase === 'pressed' ? 'play' : (item.grooves?.length || !item.entries.length) ? 'draft-disc' : 'trip';
+    go(next);
+    setDraftEntering(next === 'draft-disc');
   }
 
   async function persist(value, next) {
@@ -480,8 +484,9 @@ function App() {
 
         {page === 'blank' && <NewAlbum form={form} update={(patch) => setForm((value) => ({ ...value, ...patch }))}
           save={createTrip} busy={busy} back={goHome} complete={() => go('draft-disc')} />}
-        {page === 'draft-disc' && album && <BlankRecord enter={editDraftDetails} finish={finishAlbum}
-          home={goHome} record={() => go('trip')} grooveCount={album.grooves?.length || 0} engraving={engraving} />}
+        {page === 'draft-disc' && album && <BlankRecord album={album} enter={editDraftDetails} finish={finishAlbum}
+          home={goHome} record={() => go('trip')} grooveCount={album.grooves?.length || 0} engraving={engraving}
+          entering={draftEntering} entered={() => setDraftEntering(false)} />}
         {page === 'create' && <TripDetails form={form} update={(patch) => setForm((value) => ({ ...value, ...patch }))}
           save={createTrip} busy={busy} back={() => go(editingDetails ? 'draft-disc' : 'blank')} />}
 

@@ -26,6 +26,19 @@ demos[3].entries.push(...[
   id: 'paris-moment-' + index, day: demos[3].start, kind: 'audio', name, time, src, art: { trackId: 'paris-photo' },
 })));
 
+// Covers copied from the reference project's public/img into this app's assets.
+const demoCoverNames = ['jeju', 'lisbon', 'kyoto', null, 'bangkok', 'reykjavik', 'newyork'];
+for (const [index, name] of demoCoverNames.entries()) {
+  if (!name) continue;
+  const album = demos[index];
+  const photo = { id: name + '-cover', day: album.start, kind: 'photo', name: album.city, src: import.meta.env.BASE_URL + 'art/' + name + '-cover.jpg' };
+  album.entries.unshift(photo);
+  album.art = { trackId: photo.id };
+  for (const entry of album.entries) {
+    if (entry.kind === 'audio' || entry.kind === 'video') entry.art = { trackId: photo.id };
+  }
+}
+
 let database;
 function openArchive() {
   if (!database) database = new Promise((resolve, reject) => {

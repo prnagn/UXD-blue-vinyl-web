@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MomentMap } from './moment-map';
-import { albumPlaybackTracks, trackArt } from './archive';
+import { albumArt, albumPlaybackTracks, trackArt } from './archive';
 import { SpotifyPlayer } from './spotify-player';
 import { ReplayArm } from './replay-arm';
 import { trackRadius } from './replay-geometry';
@@ -29,7 +29,7 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
   const zoomTimer = useRef(null);
   const index = tracks.indexOf(track);
   const source = useMedia(track);
-  const currentPhoto = trackArt(album, track);
+  const currentPhoto = trackArt(album, track) || (!track ? albumArt(album) : undefined);
   const art = useMedia(currentPhoto);
   const isMedia = track?.kind === 'audio' || track?.kind === 'video';
   const isSpotify = track?.kind === 'spotify';

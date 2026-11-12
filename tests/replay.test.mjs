@@ -83,6 +83,19 @@ try {
   assert.deepEqual(new Set(reordered.entries.map(entry => entry.id)), new Set(album.entries.map(entry => entry.id)));
   const engraved = { ...album, grooves: [{ entryIds: ['p1', 'a1'] }] };
   assert.equal(reorderMoments(engraved, ['p1', 'p2']), engraved, 'already engraved moments must not be reordered');
+  const { engravedPhotos, grooveRadius } = await server.ssrLoadModule('/src/draft-photo-pins.jsx');
+  const pinnedAlbum = { ...album, grooves: [{ day: p1.day, entryIds: ['p2', 'a2', 'p1', 'a1', 'missing'] }] };
+  const photoPins = engravedPhotos(pinnedAlbum);
+  assert.deepEqual(photoPins.map(pin => pin.photo.id), ['p2', 'p1'], 'pins must follow the engraved photo order and exclude pending photos');
+  for (const pin of photoPins) {
+    assert(Math.abs(Math.hypot(pin.x - 50, pin.y - 50) - grooveRadius(pin.grooveIndex, 1)) < .00001, 'each photo pin foot must land on its own engraved ring');
+  }
+  assert.deepEqual(engravedPhotos({ ...album, grooves: [] }), [], 'an empty LP must not show photo pins');
+  assert.deepEqual(engravedPhotos({ ...album, grooves: [{ entryIds: ['a2', 'memo'] }] }), [], 'audio-only or memo grooves must not invent a photo');
+  const { BlankRecord } = await server.ssrLoadModule('/src/trip-details.jsx');
+  const pinnedDisc = renderToStaticMarkup(React.createElement(BlankRecord, { album: pinnedAlbum, grooveCount: 1, engraving: true }));
+  assert(pinnedDisc.includes('src="/one.jpg"') && pinnedDisc.includes('src="/two.jpg"'));
+  assert.equal((pinnedDisc.match(/class="draft-photo-pin new-photo-pin"/g) || []).length, 2, 'engraved photos must appear as pins when the groove is cut');
   assert.deepEqual(replayTracks(album.entries).map(t => t.id), ['a1', 'a2', 'p3']);
   const playlist = albumPlaybackTracks(album.entries);
   assert.deepEqual(playlist.map(t => t.id), ['a1', 'a1:spotify', 'a2', 'p3']);
@@ -102,6 +115,15 @@ try {
   const withSong = renderToStaticMarkup(React.createElement(TripMoment, { album, entries: [p1, a1], note: '', day: p1.day }));
   assert(withSong.includes('Saved Song') && !withSong.includes('노래 추가'));
   assert(withSong.includes('moment-carousel') && withSong.includes('새로운 기록'), 'the last carousel slot must open a new recording');
+  const allSummary = renderToStaticMarkup(React.createElement(TripMoment, {
+    album, entries: [{ ...p1, place: 'Old location' }, a1, { ...p2, place: 'Current location' }, a2], note: '', day: p1.day,
+  }));
+  assert.equal((allSummary.match(/class="carousel-viewport"/g) || []).length, 1, 'photo scrolling must be contained in one viewport');
+  assert.equal((allSummary.match(/class="carousel-slide"/g) || []).length, 3, 'both photo records and the final new-recording slot must slide together');
+  assert(allSummary.indexOf('class="moment-photo-count"') < allSummary.indexOf('class="capture-note"'), 'the note must remain outside the moving photo rail');
+  assert.equal((allSummary.match(/class="moment-location"/g) || []).length, 1, 'changing records must use a single location row');
+  assert.equal((allSummary.match(/class="location-source"/g) || []).length, 1, 'location attribution must appear only once');
+  assert(allSummary.includes('Current location') && !allSummary.includes('Old location'), 'only the selected record location may be shown');
   const { AlbumPlayer } = await server.ssrLoadModule('/src/album-player.jsx');
   const first = renderToStaticMarkup(React.createElement(AlbumPlayer, { album, tracks: album.entries, track: a1 }));
   const second = renderToStaticMarkup(React.createElement(AlbumPlayer, { album, tracks: album.entries, track: a2 }));

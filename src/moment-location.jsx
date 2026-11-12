@@ -14,8 +14,9 @@ function allowed() {
   try { return localStorage.getItem(consentKey) === 'photon'; } catch { return false; }
 }
 
-export function MomentLocation({ initialPlace = '', save, busy, autoLocate = true }) {
-  const [place, setPlace] = useState(initialPlace);
+export function MomentLocation({ recordId = '', initialPlace = '', save, busy, autoLocate = true }) {
+  const [location, setLocation] = useState({ id: recordId, value: initialPlace });
+  const place = location.id === recordId ? location.value : initialPlace;
   const [asking, setAsking] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -23,15 +24,20 @@ export function MomentLocation({ initialPlace = '', save, busy, autoLocate = tru
   const request = useRef(null);
   const saveRef = useRef(save);
   saveRef.current = save;
+  const activeRecord = useRef(recordId);
+  activeRecord.current = recordId;
 
   async function locate() {
     if (busy || loading) return;
     if (!navigator.geolocation) { setError('위치를 사용할 수 없는 브라우저예요.'); return; }
     const call = ++generation.current;
+    const targetId = recordId;
+    const savePlace = saveRef.current;
+    const current = () => generation.current === call && activeRecord.current === targetId;
     setAsking(false); setLoading(true); setError('');
     try {
       const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }));
-      if (generation.current !== call) return;
+      if (!current()) return;
       const { latitude, longitude } = position.coords;
       const key = latitude.toFixed(4) + ',' + longitude.toFixed(4);
       let label = cache.get(key);
@@ -51,18 +57,20 @@ export function MomentLocation({ initialPlace = '', save, busy, autoLocate = tru
           cache.set(key, label);
         } finally { clearTimeout(timeout); }
       }
-      if (generation.current !== call) return;
-      setPlace(label);
-      if (await saveRef.current?.(label) === false) setError('위치명을 저장하지 못했어요. 다시 눌러 주세요.');
+      if (!current()) return;
+      setLocation({ id: targetId, value: label });
+      if (await savePlace?.(label) === false && current()) setError('위치명을 저장하지 못했어요. 다시 눌러 주세요.');
     } catch (failure) {
-      if (generation.current === call) setError(failure.code === 1 ? '위치 권한을 허용해 주세요.' : '현재 위치를 확인하지 못했어요. 다시 눌러 주세요.');
-    } finally { if (generation.current === call) setLoading(false); }
+      if (current()) setError(failure.code === 1 ? '위치 권한을 허용해 주세요.' : '현재 위치를 확인하지 못했어요. 다시 눌러 주세요.');
+    } finally { if (current()) setLoading(false); }
   }
 
   useEffect(() => {
+    setLocation({ id: recordId, value: initialPlace });
+    setAsking(false); setLoading(false); setError('');
     if (!initialPlace && autoLocate && allowed()) locate();
     return () => { generation.current++; request.current?.abort(); };
-  }, []);
+  }, [recordId, initialPlace, autoLocate]);
 
   return <div className="moment-location">
     <button className="moment-place" disabled={busy || loading} onClick={() => allowed() ? locate() : setAsking(true)}>

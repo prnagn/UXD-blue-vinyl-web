@@ -61,12 +61,15 @@ export function TripMoment({ album, entries, day, note, setNote, home, capture, 
       <span>MOMENT {(album.grooves || []).length + 1}</span>
       <button className="icon-button" onClick={home} disabled={busy} aria-label="선반으로 돌아가기"><Icon name="list" size={17} /></button>
     </header>
-    {selected && <MomentLocation key={selected.id} initialPlace={selected.place} busy={busy} autoLocate={selected.id === initial.current}
-      save={(place) => savePlace?.(place, selected.entries.map(entry => entry.id))} />}
-    <div className="capture-body">
-      <MomentCarousel groups={groups} selectedId={selectedId} select={select} previewOrder={setOrder} commitOrder={commitOrder}
+    <div className="moment-location-slot" style={!selected ? { visibility: 'hidden' } : undefined} aria-hidden={!selected}>
+      <MomentLocation recordId={selectedId} initialPlace={selected?.place || ''} busy={busy || !selected} autoLocate={Boolean(selected) && selected.id === initial.current}
+        save={(place) => selected && savePlace?.(place, selected.entries.map(entry => entry.id))} />
+    </div>
+    <MomentCarousel groups={groups} selectedId={selectedId} select={select} previewOrder={setOrder} commitOrder={commitOrder}
         capture={capture} play={playPhoto} playing={source ? ambientPlaying : spotifyPlaying} busy={busy}
         onEditing={(value) => { setEditing(value); if (value) audio.current?.pause(); }} />
+    <div className="capture-body">
+      <div className={'capture-song-slot' + (groups.some(group => group.spotify) ? ' has-songs' : '')}>
       {spotify && <div className="capture-songs">
         <div className="day-song spotify-song">
           <span className="day-song-disc" aria-hidden="true" /><span className="day-song-info"><strong>{spotify.name}</strong><small>{spotify.artist}</small></span>
@@ -76,6 +79,7 @@ export function TripMoment({ album, entries, day, note, setNote, home, capture, 
           onPlaying={(value) => { if (activeId.current === selected.id) setSpotifyPlaying(value); }}
           onReady={(controller) => { if (spotifyIntent.current) { spotifyIntent.current = false; controller.resume(); } }} />
       </div>}
+      </div>
       <label className="capture-note">NOTE
         <textarea rows={2} maxLength={3000} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Write this moment briefly..." />
       </label>
