@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { JourneyWheel } from './journey-wheel';
 import { Icon, Top, Vinyl } from './ui';
 
-export function BlankRecord({ back, enter, finish, menu, record, grooveCount = 0, engraving = false }) {
+export function BlankRecord({ back, enter, finish, home, record, grooveCount = 0, engraving = false }) {
   const [wheel, setWheel] = useState(false);
   const visibleGrooves = Math.min(grooveCount, 80);
   return <div className="blank-record">
-    <Top title="" back={back} action={menu || (() => setWheel((open) => !open))} actionLabel={menu ? 'LP 메뉴' : 'LP 휠 메뉴'} />
+    <Top title="" back={back} action={home || (() => setWheel((open) => !open))} actionLabel={home ? '선반으로 돌아가기' : 'LP 휠 메뉴'} />
     <div className="blank-stage">
       <Vinyl color="#36363a" />
       {grooveCount > 0 && <svg className="engraved-grooves" viewBox="0 0 100 100" aria-hidden="true">

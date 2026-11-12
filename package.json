@@ -7,8 +7,9 @@
     "dev": "vite",
     "build": "vite build --base=./",
     "preview": "vite preview",
+    "test:replay": "node tests/replay.test.mjs",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "react": "19.2.0",
