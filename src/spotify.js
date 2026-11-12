@@ -81,7 +81,11 @@ export function useSpotify(enabled) {
       failure.status = response.status;
       throw failure;
     }
-    return response.status === 204 ? null : response.json();
+    if (response.status === 204 || options.method === 'PUT') {
+      return null;
+    }
+
+    return response.json();
   }
 
   function requireControl() {
