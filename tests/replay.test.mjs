@@ -5,8 +5,20 @@ import { createServer } from 'vite';
 import { startAmbient } from '../src/ambient-audio.js';
 import { parkedAngle, needleRadius, trackRadius, trackAngle } from '../src/replay-geometry.js';
 import './capture.test.mjs';
+import './spotify-browser.test.mjs';
 import { playbackDays, dayPosition, trackAtPosition } from '../src/playback-days.js';
 import { centeredScroll, reorderPosition, reorderSpacing } from '../src/carousel-layout.js';
+import { availableOnTurntable, parcelState } from '../src/parcel-state.js';
+
+const parcelAlbum = { id: 'parcel', name: 'Journey', city: 'Daejeon', country: 'Korea', start: '2026-11-12', entries: [], phase: 'pressed',
+  delivery: { dispatchedOn: '2026-11-12', arrivesOn: '2026-11-15', destination: 'Seoul' } };
+assert.deepEqual(parcelState(parcelAlbum, '2026-11-12'), { status: 'transit', days: 3 });
+assert.deepEqual(parcelState(parcelAlbum, '2026-11-15'), { status: 'arrived', days: 0 });
+assert.deepEqual(parcelState(parcelAlbum, '2026-11-16'), { status: 'arrived', days: 0 }, 'an unopened delivery must stay ready to unwrap after D-day');
+assert.equal(availableOnTurntable(parcelAlbum, '2026-11-15'), false, 'the turntable must wait until the parcel is opened');
+const openedParcel = { ...parcelAlbum, delivery: { ...parcelAlbum.delivery, unpackedAt: '2026-11-15T03:00:00.000Z' } };
+assert.equal(availableOnTurntable(openedParcel, '2026-11-16'), true, 'persisted opened parcels must remain available on later visits');
+assert.equal(availableOnTurntable({ entries: [] }, '2026-11-12'), true);
 
 for (const width of [280, 390, 432]) {
   for (const count of [1, 3, 8]) {
@@ -90,6 +102,12 @@ const server = await createServer({ server: { middlewareMode: true }, appType: '
 try {
   const { replayTracks, albumPlaybackTracks, trackArt, albumFile, importAlbum, resetArchive } = await server.ssrLoadModule('/src/archive.js');
   const { pendingMoments, reorderMoments } = await server.ssrLoadModule('/src/moment-groups.js');
+  const { ParcelShelf } = await server.ssrLoadModule('/src/parcel-shelf.jsx');
+  const inTransit = renderToStaticMarkup(React.createElement(ParcelShelf, { album: parcelAlbum, today: '2026-11-12', expanded: true }));
+  assert(inTransit.includes('D-3') && inTransit.includes('IN TRANSIT') && inTransit.includes('Seoul'), 'the shelf must show the parcel, countdown and destination while shipping');
+  assert(/class="parcel-box" disabled=""/.test(inTransit), 'parcels must not be opened before their arrival day');
+  const delivered = renderToStaticMarkup(React.createElement(ParcelShelf, { album: parcelAlbum, today: '2026-11-15', expanded: true }));
+  assert(delivered.includes('parcel-arrived') && delivered.includes('D-DAY') && !/class="parcel-box" disabled=""/.test(delivered), 'the arrived parcel must shake and allow unwrapping');
   const song = { id: '1234567890123456789012', name: 'Saved Song', artist: 'Artist', url: 'https://open.spotify.com/track/1234567890123456789012' };
   const p1 = { id: 'p1', kind: 'photo', src: '/one.jpg', day: '2026-11-11', time: '09:01', captureId: 'one', spotify: song };
   const a1 = { id: 'a1', kind: 'audio', fieldRecording: true, blob: new Blob(['audio'], { type: 'audio/webm' }), day: p1.day, time: p1.time, captureId: 'one', spotify: song, waveform: [.2, .5], durationMs: 1000 };

@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { MomentMap } from './moment-map';
 import { albumArt, albumPlaybackTracks, trackArt } from './archive';
 import { SpotifyPlayer } from './spotify-player';
+import { SpotifyPlaybackContext } from './spotify-context';
 import { ReplayArm } from './replay-arm';
 import { trackRadius } from './replay-geometry';
 import { ScatteredPhotos } from './album-photos';
@@ -10,6 +11,7 @@ import { DayTimeline } from './day-timeline';
 import { albumTitle, Icon, Top, useMedia, Vinyl } from './ui';
 
 export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, selectedId, onTrack, back, send, autoStart, save, busy }) {
+  const spotifyService = useContext(SpotifyPlaybackContext);
   const tracks = albumPlaybackTracks(allTracks);
   const track = tracks.find((entry) => entry.id === (selectedId || selectedTrack?.id)) || tracks[0];
   const [playing, setPlaying] = useState(false);
@@ -67,6 +69,7 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
 
   function select(entry, autoplay = false) {
     if (!entry) return;
+    if (autoplay && entry.kind === 'spotify') spotifyService?.activatePlayback?.();
     stop();
     wantsPlayback.current = autoplay && entry.kind !== 'spotify';
     spotifyIntent.current = autoplay && entry.kind === 'spotify' ? entry.id : '';
@@ -80,6 +83,7 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
 
   async function play() {
     if (isSpotify) {
+      spotifyService?.activatePlayback?.();
       setReveal(true);
       if (spotifyController.current) spotifyController.current.togglePlay();
       else spotifyIntent.current = track.id;

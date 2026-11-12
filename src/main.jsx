@@ -6,6 +6,8 @@ import { ArtPicker } from './art-picker';
 import { BlankRecord, TripDetails } from './trip-details';
 import { NewAlbum } from './new-album';
 import { HomeTurntable } from './home-turntable';
+import { ParcelShelf } from './parcel-shelf';
+import { availableOnTurntable, parcelState } from './parcel-state';
 import { JourneyConfirm, PressCompleted, PressRecord } from './press-record';
 import { ReturnMail, ShippingScreen } from './shipping';
 import { TripMoment } from './trip-moment';
@@ -129,7 +131,7 @@ function App() {
 
   const albums = [...records, ...demos.filter((demo) => !records.some((record) => record.id === demo.id))]
     .sort((a, b) => b.start.localeCompare(a.start));
-  const shelfAlbums = albums.filter((item) => !item.delivery || item.delivery.arrivesOn <= today);
+  const shelfAlbums = albums;
   const album = previewDelivery?.album || albums.find((item) => item.id === id);
   const cover = useMedia(albumArt(album));
   const latestPhoto = album?.entries.findLast((entry) => entry.kind === 'photo');
@@ -160,6 +162,10 @@ function App() {
   }, [loaded, spotify.resumeAlbumId, records, go]);
 
   function openAlbum(item) {
+    if (!availableOnTurntable(item, today)) {
+      go('home'); setPreview(item.id);
+      return;
+    }
     setPreviewDelivery(null);
     setShareLink('');
     setId(item.id);
@@ -300,6 +306,13 @@ function App() {
     if (await persist({ ...album, delivery })) goHome();
   }
 
+  async function unpackAlbum(item) {
+    if (parcelState(item, today).status !== 'arrived') return false;
+    const saved = await persist({ ...item, delivery: { ...item.delivery, unpackedAt: new Date().toISOString() } });
+    if (saved) setPreview(item.id);
+    return saved;
+  }
+
   function editDraftDetails() {
     setForm({ name: album.name || albumTitle(album), city: album.city, country: album.country, start: album.start, end: album.end });
     setEditingDetails(true);
@@ -425,7 +438,7 @@ function App() {
   }
 
   const goHome = () => { setPreview(''); setPreviewDelivery(null); go('home'); };
-  const latest = shelfAlbums.filter((item) => item.phase === 'pressed')
+  const latest = shelfAlbums.filter((item) => item.phase === 'pressed' && availableOnTurntable(item, today))
     .sort((a, b) => completionTime(b) - completionTime(a))[0];
   const returnFromPlayer = () => {
     if (previewDelivery) {
@@ -465,12 +478,15 @@ function App() {
               <span className="spine">+ Add New Album</span><span className="empty-face"><Icon name="plus" size={25} /></span>
             </button>
             {shelfAlbums.map((item, index) => <div className="shelf-item" key={item.id}>
+              {!availableOnTurntable(item, today) ? <ParcelShelf album={item} today={today} expanded={preview === item.id}
+                toggle={() => setPreview(preview === item.id ? '' : item.id)} unpack={unpackAlbum} busy={busy} /> : <>
               <button className={'sleeve sleeve-' + index % 3} aria-expanded={preview === item.id}
                 onClick={() => setPreview(preview === item.id ? '' : item.id)}>
                 <span className="spine"><strong>{albumTitle(item)}</strong><span>{dateLabel(item.start)}</span>{item.phase === 'trip' && <i />}</span>
                 <SleeveFace album={item} />
               </button>
               {preview === item.id && <PullSleeve album={item} open={() => openAlbum(item)} />}
+              </>}
             </div>)}
           </section>
           <div className="home-foot">

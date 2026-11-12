@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { playingTrack, prepareSpotifyCapture } from './spotify-capture';
+import { createBrowserPlayback } from './spotify-browser';
 
 const clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID || '54cf66c4350b4a30a25b3baa9ead4244';
 const tokenKey = 'blue-vinyl-spotify';
 const loginKey = 'blue-vinyl-spotify-login';
-const scopes = ['user-read-currently-playing', 'user-read-playback-state', 'user-modify-playback-state'];
+const scopes = ['user-read-currently-playing', 'user-read-playback-state', 'user-modify-playback-state', 'streaming', 'user-read-email', 'user-read-private'];
 const encode = (bytes) => btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 
 function storedToken() {
@@ -27,6 +28,9 @@ export function useSpotify(enabled) {
   const [track, setTrack] = useState(null);
   const [error, setError] = useState('');
   const [connecting, setConnecting] = useState(false);
+  const [browserReady, setBrowserReady] = useState(false);
+  const [playbackError, setPlaybackError] = useState('');
+  const browser = useRef(null);
   const [resumeAlbumId, setResumeAlbumId] = useState('');
   const handled = useRef(false);
   const refresh = useRef(null);
@@ -46,6 +50,9 @@ export function useSpotify(enabled) {
   }
 
   function disconnect() {
+    browser.current?.disconnect();
+    browser.current = null;
+    setBrowserReady(false); setPlaybackError('');
     sessionStorage.removeItem(tokenKey);
     tokenRef.current = null;
     setToken(null);
@@ -77,7 +84,7 @@ export function useSpotify(enabled) {
     let response = await send(await accessToken());
     if (response.status === 401) response = await send(await accessToken(true));
     if (!response.ok) {
-      const failure = new Error(response.status === 403 ? 'Spotify 재생 제어 권한과 Premium 계정을 확인해 주세요.' : response.status === 404 ? '휴대폰의 Spotify 앱에서 먼저 재생해 주세요.' : 'Spotify에 연결하지 못했어요.');
+      const failure = new Error(response.status === 403 ? 'Spotify 스트리밍 권한과 Premium 계정을 확인해 주세요.' : response.status === 404 ? '브라우저 재생기를 준비하지 못했어요. 재생 버튼을 다시 눌러 주세요.' : 'Spotify에 연결하지 못했어요.');
       failure.status = response.status;
       throw failure;
     }
@@ -93,25 +100,36 @@ export function useSpotify(enabled) {
     if (!scopes.every((scope) => granted.has(scope))) throw new Error('설정에서 Spotify를 다시 연결해 주세요.');
   }
 
-  function playSong(id) { return serial(async () => {
-    requireControl();
-    const state = await request('/me/player');
-    if (!state?.device?.id || state.device.is_restricted) throw new Error('휴대폰의 Spotify 앱에서 먼저 재생해 주세요.');
-    const sameSong = state.item?.id === id;
-    if (sameSong && state.is_playing) return;
-    return request('/me/player/play?device_id=' + encodeURIComponent(state.device.id), {
-      method: 'PUT', body: sameSong ? undefined : { uris: ['spotify:track:' + id] },
+  const streamingAllowed = Boolean(token) && scopes.every((scope) => (token.scope || '').split(' ').includes(scope));
+  useEffect(() => {
+    if (!streamingAllowed) return;
+    let active = true;
+    const client = createBrowserPlayback({ getAccessToken: () => accessToken(), request,
+      onReady: (ready) => { if (active) { setBrowserReady(ready); if (ready) setPlaybackError(''); } },
+      onError: (message) => { if (active) setPlaybackError(message); },
     });
-  }); }
+    browser.current = client;
+    client.connect().catch((failure) => { if (active) setPlaybackError(failure.message); });
+    return () => {
+      active = false; client.disconnect();
+      if (browser.current === client) browser.current = null;
+    };
+  }, [streamingAllowed]);
+
+  function activatePlayback() { return browser.current?.activate(); }
+
+  function playSong(id) {
+    activatePlayback();
+    setPlaybackError('');
+    return serial(async () => {
+      requireControl();
+      if (!browser.current) throw new Error('Spotify 브라우저 재생기를 준비 중이에요. 잠시 후 다시 눌러 주세요.');
+      return browser.current.play(id);
+    });
+  }
 
   function pauseSong(id) { return serial(async () => {
-    requireControl();
-    const state = await request('/me/player');
-    if (state?.is_playing && state.item?.id !== id) return false;
-    if (state?.is_playing && state.item?.id === id && state.device?.id) {
-      await request('/me/player/pause?device_id=' + encodeURIComponent(state.device.id), { method: 'PUT' });
-    }
-    return true;
+    return browser.current ? browser.current.pause(id) : true;
   }); }
 
   async function prepareRecording(options) {
@@ -209,6 +227,7 @@ export function useSpotify(enabled) {
 
   const granted = new Set((token?.scope || '').split(' '));
   return { track, connected: Boolean(token), needsReconnect: Boolean(token) && !scopes.every((scope) => granted.has(scope)),
-    connecting, error, connect, disconnect, resumeAlbumId, prepareRecording,
-    getPlayback: () => request('/me/player'), playSong, pauseSong };
+    connecting, error: playbackError || error, playbackError, browserReady, connect, disconnect, resumeAlbumId, prepareRecording,
+    activatePlayback, subscribePlayback: (listener) => browser.current?.subscribe(listener) || (() => {}),
+    getPlayback: () => browser.current?.getPlayback() || Promise.resolve(null), playSong, pauseSong };
 }

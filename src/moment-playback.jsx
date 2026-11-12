@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Icon, useMedia } from './ui';
 import { startAmbient } from './ambient-audio';
 import { SpotifyPlayer } from './spotify-player';
+import { SpotifyPlaybackContext } from './spotify-context';
 
 function useAmbient(source, onPlaying) {
   const context = useRef(null);
@@ -87,6 +88,7 @@ function useAmbient(source, onPlaying) {
 }
 
 export function MomentPlayback({ entry, onPlaying }) {
+  const spotifyService = useContext(SpotifyPlaybackContext);
   const source = useMedia(entry?.kind === 'audio' ? entry : null);
   const ambient = useAmbient(source, onPlaying);
   const song = entry?.spotify && /^[a-zA-Z0-9]{22}$/.test(entry.spotify.id) ? entry.spotify : null;
@@ -107,6 +109,7 @@ export function MomentPlayback({ entry, onPlaying }) {
     const call = ++choice.current;
     ambient.stop();
     if (next.id === 'spotify') {
+      spotifyService?.activatePlayback?.();
       setSelected(next.id);
       spotifyIntent.current = true;
       setSpotifyOpen(true);
@@ -130,7 +133,7 @@ export function MomentPlayback({ entry, onPlaying }) {
     </div>
     <div className="moment-transport">
       <button className="icon-button" aria-label="이전 트랙" disabled={index === 0} onClick={() => choose(segments[index - 1])}><Icon name="skip-back" /></button>
-      <button className="moment-segment-play" aria-label={segment.id === 'spotify' ? 'Spotify 플레이어 열기' : ambient.playing ? '현장음 정지' : segment.label + ' 재생'}
+      <button className="moment-segment-play" aria-label={segment.id === 'spotify' ? 'Spotify 곡 재생' : ambient.playing ? '현장음 정지' : segment.label + ' 재생'}
         disabled={ambient.loading} onClick={() => segment.id === 'spotify' && spotifyController.current ? spotifyController.current.togglePlay() : ambient.playing ? ambient.stop() : choose(segment)}>
         <Icon name={ambient.playing ? 'pause' : 'play'} size={17} /><span>{ambient.loading ? '불러오는 중' : segment.id === 'spotify' ? 'Spotify' : segment.label}</span>
       </button>

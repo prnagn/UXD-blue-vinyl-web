@@ -311,6 +311,48 @@ p,h1,h2,blockquote{margin:0}
 .sleeve-2 .sleeve-face{background:linear-gradient(168deg,#858885,#777a78)}
 .sleeve:hover .sleeve-face,.sleeve[aria-expanded=true] .sleeve-face,.empty-sleeve:hover .empty-face{filter:brightness(1.14)}
 .sleeve[aria-expanded=true] .sleeve-face{height:12px}
+.parcel-sleeve .spine>svg{flex:none}
+.parcel-shelf-face{display:block;height:clamp(43px,8.5dvh,76px);clip-path:polygon(0 0,100% 0,96% 100%,4% 100%);background:repeating-linear-gradient(118deg,#ffffff0b 0 2px,transparent 2px 7px),linear-gradient(135deg,#c4ad89,#ae9167);transition:height .25s}
+.parcel-sleeve[aria-expanded=true] .parcel-shelf-face{height:12px}
+.parcel-arrived:not(.parcel-opening) .parcel-sleeve,.parcel-arrived:not(.parcel-opening) .parcel-box{animation:parcel-arrived-shake 4.2s ease-in-out infinite;transform-origin:50% 75%}
+.parcel-preview{padding:5px 0 13px;overflow:hidden;animation:unfold .25s ease both}
+.parcel-preview-stage{display:flex;align-items:center;gap:16px;padding:17px 0 16px;min-width:0}
+.parcel-box{flex:none;width:64%;aspect-ratio:1;position:relative;padding:0;border:0;border-radius:3px;background:#bea077;box-shadow:0 12px 22px #18213870;perspective:700px;text-align:left;cursor:pointer;transition:background .3s,box-shadow .3s}
+.parcel-box:disabled{opacity:1;cursor:default}
+.parcel-inner{position:absolute;inset:0;z-index:1;opacity:0;pointer-events:none}
+.parcel-inner .cover{position:absolute;width:77%;aspect-ratio:1;left:0;top:8%;font-size:32px;box-shadow:0 7px 12px #17213b44;border-radius:3px}
+.parcel-inner .vinyl{position:absolute;width:83%;left:21%;top:11%;box-shadow:0 6px 17px #17213b44}
+.parcel-paper{position:absolute;z-index:2;top:0;bottom:0;width:50%;background:repeating-linear-gradient(118deg,#ffffff0b 0 2px,transparent 2px 7px),linear-gradient(135deg,#caae80,#b59465);backface-visibility:hidden}
+.parcel-paper-left{left:0;border-radius:3px 0 0 3px;transform-origin:0 50%}
+.parcel-paper-right{right:0;border-radius:0 3px 3px 0;transform-origin:100% 50%}
+.parcel-details{position:absolute;z-index:3;inset:0;color:#5e4b33;pointer-events:none}
+.parcel-tape{position:absolute;background:#efe0be;box-shadow:0 0 0 1px #ab8e6040}
+.parcel-tape.vertical{top:0;bottom:0;left:62%;width:4px}
+.parcel-tape.horizontal{left:0;right:0;top:58%;height:4px}
+.parcel-stamp{position:absolute;right:7%;top:7%;width:20%;height:24%;border:3px dotted #f3ead7;background:repeating-linear-gradient(125deg,#d8b882 0 2px,#9baebb 2px 4px,transparent 4px 9px),#d4c1a0;transform:rotate(5deg)}
+.parcel-postmark{position:absolute;right:12%;top:20%;width:36%;aspect-ratio:1;border:1px solid #76614499;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;font:7px var(--serif);text-transform:uppercase;transform:rotate(-12deg);overflow:hidden}
+.parcel-postmark b{border-block:1px solid #76614488;padding:2px;font-size:9px;letter-spacing:.14em}
+.parcel-address{position:absolute;left:7%;right:5%;bottom:8%;font:italic clamp(11px,3.1vw,15px)/1.5 var(--serif);overflow-wrap:anywhere}
+.parcel-status{flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:5px;color:#f5f3ef;transition:opacity .25s}
+.parcel-status>span{font-size:9px;letter-spacing:.025em;white-space:nowrap}
+.parcel-status strong{font-size:21px;white-space:nowrap}
+.parcel-caption{display:flex;justify-content:center;align-items:baseline;gap:10px;text-align:center;min-width:0}
+.parcel-caption>strong{font:700 20px var(--serif);overflow-wrap:anywhere}
+.parcel-caption>span{font-size:12px;color:#e2e2eb;white-space:nowrap}
+.parcel-arrival{display:flex;justify-content:center;align-items:center;gap:7px;font-size:10px;letter-spacing:.06em;color:#e6c78f;margin-top:7px}
+.parcel-opening .parcel-box{background:transparent;box-shadow:none}
+.parcel-opening .parcel-details{animation:parcel-details-off .3s ease both}
+.parcel-opening .parcel-paper-left{animation:parcel-open-left 1.2s ease-in-out both}
+.parcel-opening .parcel-paper-right{animation:parcel-open-right 1.2s ease-in-out both}
+.parcel-opening .parcel-inner{animation:parcel-record-reveal 1.2s .25s cubic-bezier(.22,.7,.25,1) both}
+.parcel-opening .parcel-status{opacity:0}
+@keyframes parcel-arrived-shake{0%,76%,100%{transform:translateY(0) rotate(0)}80%{transform:translateY(-2px) rotate(-1.6deg)}84%{transform:translateY(-2px) rotate(1.6deg)}88%{transform:translateY(-1px) rotate(-1deg)}92%{transform:rotate(.8deg)}96%{transform:rotate(0)}}
+@keyframes parcel-details-off{to{opacity:0;transform:translateY(-5px)}}
+@keyframes parcel-open-left{0%,12%{opacity:1;transform:translateX(0) rotateY(0)}80%,100%{opacity:0;transform:translateX(-90%) rotateY(-70deg) rotateZ(-9deg)}}
+@keyframes parcel-open-right{0%,12%{opacity:1;transform:translateX(0) rotateY(0)}80%,100%{opacity:0;transform:translateX(90%) rotateY(70deg) rotateZ(9deg)}}
+@keyframes parcel-record-reveal{from{opacity:0;transform:translateY(22px) scale(.8)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes parcel-arrived-glow{0%,75%,100%{filter:brightness(1)}85%{filter:brightness(1.1)}}
+@keyframes parcel-paper-fade{to{opacity:0}}
 .home-foot{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:space-between;margin:23px 9.1% 0;color:#eeeff9a3;font-size:8px;letter-spacing:.2em}
 .home-foot-actions{display:flex;gap:15px}
 .home-spotify-error{margin:4px 9.1% 0;font-size:11px}
@@ -581,6 +623,7 @@ button.shipping-location{min-height:30px;border:0;background:none;text-decoratio
 @media(max-width:599px){.app{--app-width:100vw}}
 @media(max-width:345px){.content{padding-inline:17px}.field-pair{gap:7px}.record-grid{gap:5px}.shelf{padding-inline:8%}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+@media(prefers-reduced-motion:reduce){.parcel-arrived:not(.parcel-opening) .parcel-sleeve,.parcel-arrived:not(.parcel-opening) .parcel-box{animation-name:parcel-arrived-glow;animation-duration:4.2s!important}.parcel-opening .parcel-paper{animation-name:parcel-paper-fade;animation-duration:1.2s!important}.parcel-opening .parcel-inner{animation-name:new-details-in;animation-duration:1.2s!important}}
 @media(prefers-reduced-motion:reduce){.draft-photo-pin.new-photo-pin{animation-name:draft-pin-rise-soft;animation-duration:.65s!important}}
 @media(prefers-reduced-motion:reduce){.new-album .new-album-disc,.new-album .new-album-cover{animation-duration:var(--stage-duration)!important}}
 @media(prefers-reduced-motion:reduce){.blank-record.record-entering .blank-stage{animation-duration:1.2s!important}}
