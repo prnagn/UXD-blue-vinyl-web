@@ -6,6 +6,7 @@ import { startAmbient } from '../src/ambient-audio.js';
 import { parkedAngle, needleRadius, trackRadius, trackAngle } from '../src/replay-geometry.js';
 import './capture.test.mjs';
 import './spotify-browser.test.mjs';
+import { testSharedAirmail } from './shared-airmail.test.mjs';
 import { playbackDays, dayPosition, trackAtPosition } from '../src/playback-days.js';
 import { centeredScroll, reorderPosition, reorderSpacing } from '../src/carousel-layout.js';
 import { availableOnTurntable, parcelState } from '../src/parcel-state.js';
@@ -176,6 +177,19 @@ try {
   assert(spotifyView.includes('Saved Song') && spotifyView.includes('open.spotify.com/track/' + song.id) && !spotifyView.includes('<iframe'), 'song must use app controls without an embedded player');
   assert(spotifyView.includes('/one.jpg') && !spotifyView.includes('<audio'), 'Spotify selection must use its own photo and stop ambient audio');
   const { HomeTurntable } = await server.ssrLoadModule('/src/home-turntable.jsx');
+  const emptyHome = renderToStaticMarkup(React.createElement(HomeTurntable, {}));
+  assert(emptyHome.includes('빈 턴테이블') && !emptyHome.includes('turntable-label') && !emptyHome.includes('<audio'), 'hiding all demos must leave a valid empty turntable');
+  const { FlyingAirmail } = await server.ssrLoadModule('/src/flying-airmail.jsx');
+  const { welcomeParisDelivery } = await server.ssrLoadModule('/src/archive.js');
+  const welcome = welcomeParisDelivery();
+  assert.equal(renderToStaticMarkup(React.createElement(FlyingAirmail, {})), '', 'no received LP must mean no plane');
+  assert(renderToStaticMarkup(React.createElement(FlyingAirmail, { delivery: welcome })).includes('airmail-flight'));
+  const { Inbox } = await server.ssrLoadModule('/src/inbox.jsx');
+  const incomingView = renderToStaticMarkup(React.createElement(Inbox, { items: [welcome], index: 0 }));
+  assert(incomingView.includes('Paris, France') && incomingView.includes('지금 재생') && incomingView.includes('선반에 추가') && incomingView.includes('버리기'));
+  assert(!incomingView.includes('근처') && !incomingView.includes('@'), 'the incoming view must not add sender or distance metadata');
+  const { SharedTag } = await server.ssrLoadModule('/src/ui.jsx');
+  assert(renderToStaticMarkup(React.createElement(SharedTag)).includes('SHARED'));
   const home = renderToStaticMarkup(React.createElement(HomeTurntable, { album: { ...album, art: { trackId: p1.id } } }));
   assert(home.includes('open.spotify.com/track/' + song.id) && home.includes('Saved Song') && !home.includes('<iframe'), 'home playback must select Spotify without an embedded player');
   assert(!home.includes('<audio'), 'home must never fall back to environmental recordings');
@@ -214,5 +228,6 @@ try {
   await resetArchive();
   assert.equal(deletions, 1);
   delete globalThis.indexedDB;
+  await testSharedAirmail(await server.ssrLoadModule('/src/archive.js'));
 } finally { await server.close(); }
 console.log('PASS: recording snapshots, carousel group order, photo/song pairing, GPS labels, scoped database reset, tonearm geometry, archive round-trip');

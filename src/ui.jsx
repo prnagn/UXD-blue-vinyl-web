@@ -82,6 +82,7 @@ export function Cover({ album }) {
   const photo = useMedia(albumArt(album));
   return <div className="cover" style={{ '--cover-color': album.color }}>
     {photo ? <img src={photo} alt="" /> : <span>{albumTitle(album).slice(0, 2).toUpperCase()}</span>}
+    {album.shared && <SharedTag />}
   </div>;
 }
 
@@ -90,6 +91,10 @@ export function SleeveFace({ album }) {
   return <span className="sleeve-face">
     {photo && <img src={photo} alt="" loading="lazy" draggable={false} />}
   </span>;
+}
+
+export function SharedTag() {
+  return <span className="shared-tag"><Icon name="plane" size={9} />SHARED</span>;
 }
 
 export function PullSleeve({ album, open }) {

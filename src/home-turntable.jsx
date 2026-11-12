@@ -8,7 +8,7 @@ const overRecord = 0;
 const playBoundary = -12;
 
 export function HomeTurntable({ album, open, children }) {
-  const tracks = albumPlaybackTracks(album.entries);
+  const tracks = albumPlaybackTracks(album?.entries || []);
   const track = tracks.find((entry) => entry.kind === 'spotify') || tracks.find((entry) => entry.kind === 'audio' || entry.kind === 'video');
   const isSpotify = track?.kind === 'spotify';
   const source = useMedia(track);
@@ -21,7 +21,7 @@ export function HomeTurntable({ album, open, children }) {
   const pointer = useRef(null);
   const art = useMedia(albumArt(album));
   const angle = dragAngle ?? (playing ? overRecord : parked);
-  const title = albumTitle(album);
+  const title = album ? albumTitle(album) : '';
   useEffect(() => {
     const media = ambient.current;
     return () => media?.pause();
@@ -81,14 +81,14 @@ export function HomeTurntable({ album, open, children }) {
   }
 
   return <><section className="turntable" aria-label="Blue Vinyl">
-    <button className="latest-disc" onClick={open} aria-label={'최근 LP · ' + title}>
+    <button className="latest-disc" onClick={open} disabled={!album} aria-label={album ? '최근 LP · ' + title : '빈 턴테이블'}>
       <Vinyl
         color="#d9d9d7"
         image={art}
         playing={playing && angle >= playBoundary}
       />
     </button>
-    <button className={'home-arm' + (dragAngle !== null ? ' dragging' : '')}
+    <button className={'home-arm' + (dragAngle !== null ? ' dragging' : '')} disabled={!album}
       style={{ '--arm-angle': angle + 'deg' }}
       aria-label="톤암 · LP 재생 또는 정지" aria-pressed={playing}
       aria-description="톤암을 판 위로 끌어 재생하고, 오른쪽으로 빼서 정지하세요."
@@ -99,10 +99,10 @@ export function HomeTurntable({ album, open, children }) {
       }}>
       <Arm />
     </button>
-    <div className="turntable-label">
+    {album && <div className="turntable-label">
       <strong>{title}</strong>
       {(notice || track) && <small role="status">{notice || track.name || '현장의 소리'}</small>}
-    </div>
+    </div>}
     {children}
   </section>
     {isSpotify && <div className="home-spotify-player" aria-label="LP에 기록된 Spotify 곡">

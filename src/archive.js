@@ -85,6 +85,47 @@ export async function loadInbox() {
   return items.filter((item) => item.album).sort((a, b) => b.receivedAt - a.receivedAt);
 }
 
+export function welcomeParisDelivery() {
+  const source = demos.find((album) => album.city === 'Paris');
+  return { id: 'welcome-paris', receivedAt: 0, album: {
+    ...source, id: 'shared-paris', demo: false, shared: true,
+    entries: source.entries.map((entry) => ({ ...entry })),
+  } };
+}
+
+// An invisible inbox marker makes this offer survive reloads without reappearing
+// after it has been saved or discarded. Resetting the archive resets the offer.
+export async function ensureWelcomeDelivery() {
+  const db = await openArchive();
+  const welcome = welcomeParisDelivery();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(['albums', 'inbox'], 'readwrite');
+    const inbox = tx.objectStore('inbox');
+    const marker = inbox.get('welcome-paris-seeded');
+    marker.onsuccess = () => {
+      if (marker.result) return;
+      const existing = tx.objectStore('albums').get(welcome.album.id);
+      existing.onsuccess = () => {
+        inbox.put({ id: 'welcome-paris-seeded', seeded: true });
+        if (!existing.result) inbox.put(welcome);
+      };
+    };
+    tx.oncomplete = resolve;
+    tx.onabort = () => reject(tx.error);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export function sharedAlbum(delivery, addedAt = Date.now()) {
+  const { delivery: shipping, ...album } = delivery.album;
+  return { ...album, demo: false, shared: true, phase: 'pressed', shelfAddedAt: addedAt };
+}
+
+export function visibleShelfAlbums(records) {
+  return records.filter((album) => !album.demo || album.shared)
+    .sort((a, b) => (b.shelfAddedAt || 0) - (a.shelfAddedAt || 0) || (b.start || '').localeCompare(a.start || ''));
+}
+
 async function writeStores(stores, write) {
   const db = await openArchive();
   return new Promise((resolve, reject) => {
@@ -99,11 +140,13 @@ async function writeStores(stores, write) {
 export const saveAlbum = (album) => writeStores(['albums'], (tx) => tx.objectStore('albums').put(album));
 export const addDelivery = (delivery) => writeStores(['inbox'], (tx) => tx.objectStore('inbox').put(delivery));
 
-export function resolveDelivery(delivery, keep) {
-  return writeStores(keep ? ['albums', 'inbox'] : ['inbox'], (tx) => {
-    if (keep) tx.objectStore('albums').put(delivery.album);
+export async function resolveDelivery(delivery, keep) {
+  const saved = keep ? sharedAlbum(delivery) : null;
+  await writeStores(keep ? ['albums', 'inbox'] : ['inbox'], (tx) => {
+    if (keep) tx.objectStore('albums').put(saved);
     tx.objectStore('inbox').delete(delivery.id);
   });
+  return saved;
 }
 
 export function localDay(now = new Date()) {

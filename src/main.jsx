@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { addDelivery, albumArt, albumFile, deliverySchedule, demos, importAlbum, loadAlbums, loadInbox, localDay, localTime, resetArchive, resolveDelivery, saveAlbum, trackArt } from './archive';
+import { addDelivery, albumArt, albumFile, deliverySchedule, ensureWelcomeDelivery, importAlbum, loadAlbums, loadInbox, localDay, localTime, resetArchive, resolveDelivery, saveAlbum, trackArt, visibleShelfAlbums } from './archive';
 import { AlbumPlayer } from './album-player';
 import { ArtPicker } from './art-picker';
 import { BlankRecord, TripDetails } from './trip-details';
@@ -16,7 +16,8 @@ import { useSpotify } from './spotify';
 import { SpotifyPlaybackContext } from './spotify-context';
 import { reorderMoments } from './moment-groups';
 import { Inbox } from './inbox';
-import { Arm, Icon, Plane, PullSleeve, SleeveFace, Top, Vinyl, albumTitle, dateLabel, entryIcons, useMedia } from './ui';
+import { FlyingAirmail } from './flying-airmail';
+import { Arm, Icon, Plane, PullSleeve, SharedTag, SleeveFace, Top, Vinyl, albumTitle, dateLabel, entryIcons, useMedia } from './ui';
 import { Recorder, TrackMedia } from './recorder';
 import { TravelMap } from './map';
 import './style.css';
@@ -72,6 +73,7 @@ function App() {
     const receiving = new Set();
     async function refreshInbox() {
       try {
+        await ensureWelcomeDelivery();
         const items = await loadInbox();
         if (active) setInbox(items);
       } catch {
@@ -129,8 +131,7 @@ function App() {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  const albums = [...records, ...demos.filter((demo) => !records.some((record) => record.id === demo.id))]
-    .sort((a, b) => b.start.localeCompare(a.start));
+  const albums = visibleShelfAlbums(records);
   const shelfAlbums = albums;
   const album = previewDelivery?.album || albums.find((item) => item.id === id);
   const cover = useMedia(albumArt(album));
@@ -210,7 +211,7 @@ function App() {
     }
     setMomentNote('');
     return persist({
-      ...details, id: crypto.randomUUID(), entries: [], phase: 'trip',
+      ...details, id: crypto.randomUUID(), entries: [], phase: 'trip', shelfAddedAt: Date.now(),
       color: colors[records.length % colors.length],
     }, navigate ? 'draft-disc' : undefined);
   }
@@ -399,14 +400,15 @@ function App() {
     saving.current = true;
     setBusy(true);
     try {
-      await resolveDelivery(delivery, keep);
+      const saved = await resolveDelivery(delivery, keep);
       if (keep) {
-        const item = delivery.album;
+        const item = saved;
         setRecords((items) => [item, ...items.filter((record) => record.id !== item.id)]);
+        setPreview('');
       }
       setInbox((items) => items.filter((item) => item.id !== delivery.id));
       setInboxIndex(0);
-      if (inbox.length === 1 && sheet === 'inbox') setSheet('');
+      if (sheet === 'inbox' && (keep || inbox.length === 1)) setSheet('');
       if (keep && previewDelivery) {
         setId(delivery.album.id);
         setPreviewDelivery(null);
@@ -454,7 +456,9 @@ function App() {
     setBusy(true);
     try {
       await resetArchive(() => setNotice('다른 Blue Vinyl 창을 닫으면 초기화를 완료합니다.'));
-      setRecords([]); setInbox([]); setId(''); setMomentNote(''); setTrackId('');
+      await ensureWelcomeDelivery();
+      const freshInbox = await loadInbox();
+      setRecords([]); setInbox(freshInbox); setId(''); setMomentNote(''); setTrackId('');
       setPreview(''); setPreviewDelivery(null); setShareLink('');
       go('home');
       setNotice('기록을 초기화했어요.');
@@ -467,11 +471,8 @@ function App() {
     <div className={'app ' + (page === 'home' ? 'home-app' : '')}>
       <main className={'screen ' + page} ref={main}>
         {page === 'home' && <>
-          <HomeTurntable key={latest.id} album={latest} open={() => openAlbum(latest)}>
-            {inbox.length > 0 && <button className="plane-button" onClick={() => { setInboxIndex(0); setSheet('inbox'); }}
-              aria-label="종이비행기 · 받은 LP">
-              <Plane />
-            </button>}
+          <HomeTurntable key={latest?.id || 'empty'} album={latest} open={() => { if (latest) openAlbum(latest); }}>
+            <FlyingAirmail delivery={inbox[0]} paused={sheet === 'inbox'} open={() => { setInboxIndex(0); setSheet('inbox'); }} />
           </HomeTurntable>
           <section className="shelf" aria-label="LP 리스트">
             <button className="empty-sleeve" disabled={!loaded} onClick={() => { setForm(newTrip()); setEditingDetails(false); go('blank'); }}>
@@ -484,6 +485,7 @@ function App() {
                 onClick={() => setPreview(preview === item.id ? '' : item.id)}>
                 <span className="spine"><strong>{albumTitle(item)}</strong><span>{dateLabel(item.start)}</span>{item.phase === 'trip' && <i />}</span>
                 <SleeveFace album={item} />
+                {item.shared && <SharedTag />}
               </button>
               {preview === item.id && <PullSleeve album={item} open={() => openAlbum(item)} />}
               </>}
