@@ -1,3 +1,5 @@
+export const bootTimings = Object.freeze({ opening: 1200, splash: 6000, quickSplash: 3000 });
+
 export function fitBootFrame(width, height) {
   return Math.max(0, Math.min(width / 393, height / 852));
 }

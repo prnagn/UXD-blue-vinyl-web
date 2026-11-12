@@ -30,19 +30,10 @@ export function Inbox({ items, index, onIndex, close, play, save, discard, busy,
     {!previewFirst && <button className="icon-button delivery-close" aria-label="닫기" onClick={close}><Icon name="close" /></button>}
     <div className="delivery-stage" key={delivery.id}>
       <div className="delivery-letter">
-        <div className="letter-envelope" aria-hidden="true">
-          <span className="letter-envelope-flap" />
-          <span className="letter-envelope-half envelope-left" />
-          <span className="letter-envelope-half envelope-right" />
-        </div>
-        <div className="letter-left-half" aria-hidden="true">
-          <span className="letter-paper letter-top-quarter" />
-          <span className="letter-paper letter-bottom-fold" />
-        </div>
-        <div className="letter-right-fold" aria-hidden="true">
-          <span className="letter-paper letter-top-quarter" />
-          <span className="letter-paper letter-bottom-fold" />
-        </div>
+        <div className="letter-paper-base" aria-hidden="true" />
+        <div className="letter-roof" aria-hidden="true" />
+        <div className="letter-corner letter-corner-left" aria-hidden="true" />
+        <div className="letter-corner letter-corner-right" aria-hidden="true" />
         <div className="letter-crease" aria-hidden="true" />
         <div className="letter-contents">
           <span className="letter-airmail-mark" aria-hidden="true">PAR AVION</span>

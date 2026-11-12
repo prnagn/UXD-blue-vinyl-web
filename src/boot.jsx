@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { BlueVinylDisc, BlueVinylIcon, BlueVinylWord } from "./brand-logo";
 import { AppIcon } from "./boot-icons";
-import { fitBootFrame, snapBootLp } from './boot-layout';
+import { bootTimings, fitBootFrame, snapBootLp } from './boot-layout';
 const DOCK = ["phone", "browser", "messages", "music"];
 const ICON = (kind, name, extra = "") => <div className={`bt-app ${extra}`} key={name}>
     <div className="bt-ic"><AppIcon kind={kind} /></div>
@@ -18,7 +18,6 @@ export default function Boot({ children, onPip }) {
   const launchScale = launchCoverScale(launch);
   const [pip, setPip] = useState({ x: 353, y: 330 });
   const [dragging, setDragging] = useState(false);
-  const [reduceMotion] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [viaPip, setViaPip] = useState(false);
   const skip = typeof location !== "undefined" && new URLSearchParams(location.search).get("boot") === "0" || typeof location !== "undefined" && (new URLSearchParams(location.search).has("code") || location.hash.startsWith("#lp="));
   const [stage, setStage] = useState(skip ? "done" : "home");
@@ -85,17 +84,18 @@ export default function Boot({ children, onPip }) {
   }
   useEffect(() => {
     if (stage === "opening") {
-      const t = setTimeout(() => setStage("splash"), reduceMotion ? 120 : 520);
+      const t = setTimeout(() => setStage("splash"), bootTimings.opening);
       return () => clearTimeout(t);
     }
     if (stage === "splash") {
-      const t = setTimeout(() => setStage("done"), reduceMotion ? 650 : viaPip ? 1500 : 4300);
+      const t = setTimeout(() => setStage("done"), viaPip ? bootTimings.quickSplash : bootTimings.splash);
       return () => clearTimeout(t);
     }
-  }, [stage, viaPip, reduceMotion]);
+  }, [stage, viaPip]);
   return <>
       {stage === "done" && children}
-      {stage !== "done" && <div ref={frame} className={`bt bt-stage-${stage}${viaPip ? ' via-pip' : ''}`}>
+      {stage !== "done" && <div ref={frame} className={`bt bt-stage-${stage}${viaPip ? ' via-pip' : ''}`}
+        style={{ '--boot-opening-duration': bootTimings.opening + 'ms', '--boot-splash-duration': (viaPip ? bootTimings.quickSplash : bootTimings.splash) + 'ms', '--boot-fade-duration': (viaPip ? 600 : 700) + 'ms', '--boot-fade-delay': ((viaPip ? bootTimings.quickSplash : bootTimings.splash) - (viaPip ? 600 : 700)) + 'ms' }}>
         {stage !== 'splash' && <div className="bt-wall" aria-hidden="true" />}
         <div ref={canvas} className="bt-canvas" style={{ '--boot-scale': scale, '--launch-x': launch.x + 'px', '--launch-y': launch.y + 'px', '--launch-width': launch.width + 'px', '--launch-height': launch.height + 'px', '--launch-scale': launchScale, '--launch-end-x': (393 - launch.width * launchScale) / 2 + 'px', '--launch-end-y': (852 - launch.height * launchScale) / 2 + 'px' }}>
           {stage === "splash" ? <div className={`bt-splash${viaPip ? " short" : ""}`}>

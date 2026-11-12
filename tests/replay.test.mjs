@@ -246,9 +246,9 @@ try {
   assert(guidedView.includes('Play now') && !guidedView.includes('add to list') && !guidedView.includes('discard') && !guidedView.includes('aria-label="닫기"'), 'first-time users must preview before saving or discarding');
   const guidedPlane = renderToStaticMarkup(React.createElement(FlyingAirmail, { delivery: welcome, guided: true }));
   assert(guidedPlane.includes('is-guided') && guidedPlane.includes('airmail-sparkles'), 'the first plane must remain discoverable until caught');
-  assert(incomingView.includes('--letter-duration:2000ms') && incomingView.includes('letter-right-fold'));
-  assert.equal((incomingView.match(/letter-bottom-fold/g) || []).length, 2, 'the sheet must unfold as four paper panels');
-  assert(incomingView.includes('letter-envelope-flap') && incomingView.includes('envelope-left') && incomingView.includes('envelope-right'), 'the opening must include a triangular envelope flap and two hinged sides');
+  assert(incomingView.includes('--letter-duration:2000ms') && incomingView.includes('letter-corner-right'));
+  assert.equal((incomingView.match(/class="letter-corner /g) || []).length, 2, 'the white sheet must unfold only its two upper corners');
+  assert(incomingView.includes('letter-paper-base') && incomingView.includes('letter-roof') && !incomingView.includes('letter-bottom-fold'), 'the same white envelope must remain throughout the opening');
   assert(incomingView.includes('aria-busy="true"'), 'actions must wait until the two-second opening finishes');
   assert(!incomingView.includes('근처') && !incomingView.includes('@'), 'the incoming view must not add sender or distance metadata');
   const { SharedTag } = await server.ssrLoadModule('/src/ui.jsx');

@@ -40,19 +40,19 @@
 .bt-zoom{position:absolute;left:0;top:0;border-radius:14px;overflow:hidden;background:#f2eee9;transform-origin:0 0;will-change:transform}
 .bt-stage-opening .bt-bv{visibility:hidden}
 /* Expand from the measured icon position using only compositor transforms. */
-.bt-zoom{width:var(--launch-width);height:var(--launch-height);animation:bt-zoom .52s cubic-bezier(.5,0,.2,1) forwards}
+.bt-zoom{width:var(--launch-width);height:var(--launch-height);animation:bt-zoom var(--boot-opening-duration,1.2s) cubic-bezier(.5,0,.2,1) forwards}
 .bt-zoom svg{width:100%;height:100%}
 @keyframes bt-zoom{from{transform:translate(var(--launch-x),var(--launch-y)) scale(1)}to{transform:translate(var(--launch-end-x),var(--launch-end-y)) scale(var(--launch-scale))}}
 
 .bt-splash{background:transparent;display:grid;place-items:center}
 @keyframes bt-bg{0%,12%{background:#747fa3}38%,100%{background:#fefefe}}
-.bt-stage-splash{background:#fefefe;animation:bt-bg 4.3s ease forwards,bt-out .5s ease 3.8s forwards}
+.bt-stage-splash{background:#fefefe;animation:bt-bg var(--boot-splash-duration,6s) ease forwards,bt-out var(--boot-fade-duration,.7s) ease var(--boot-fade-delay,5.3s) forwards}
 @keyframes bt-out{to{opacity:0}}
 .bt-lock{display:flex;align-items:center;gap:0}
-.bt-disc{opacity:0;transform:scale(.6) rotate(-120deg);animation:bt-disc 1.1s cubic-bezier(.2,.8,.2,1) .7s forwards}
+.bt-disc{opacity:0;transform:scale(.6) rotate(-120deg);animation:bt-disc 1.8s cubic-bezier(.2,.8,.2,1) .7s forwards}
 @keyframes bt-disc{to{opacity:1;transform:scale(1) rotate(0)}}
-.bt-word{overflow:hidden;max-width:0;animation:bt-word 1s cubic-bezier(.3,.7,.2,1) 1.9s forwards;white-space:nowrap}
-.bt-word span{display:block;padding-left:12px;opacity:0;transform:translateX(-20px);animation:bt-wtxt 1s ease 1.9s forwards}
+.bt-word{overflow:hidden;max-width:0;animation:bt-word 1.6s cubic-bezier(.3,.7,.2,1) 2.2s forwards;white-space:nowrap}
+.bt-word span{display:block;padding-left:12px;opacity:0;transform:translateX(-20px);animation:bt-wtxt 1.6s ease 2.2s forwards}
 @keyframes bt-word{to{max-width:200px}}
 @keyframes bt-wtxt{to{opacity:1;transform:none}}
 
@@ -67,15 +67,17 @@
 @keyframes bt-pip-hint{0%,100%{right:-40px}50%{right:-33px}}
 .bt-zoom.pip{border-radius:50%;background:#6f7ba3}
 
-.bt-stage-splash.via-pip{animation:bt-bg-s 1.5s ease forwards,bt-out .3s ease 1.2s forwards}
+.bt-stage-splash.via-pip{animation-name:bt-bg-s,bt-out}
 @keyframes bt-bg-s{0%{background:#747fa3}35%,100%{background:#fefefe}}
-.bt-splash.short .bt-disc{animation-duration:.7s;animation-delay:.1s}
+.bt-splash.short .bt-disc{animation-duration:1.3s;animation-delay:.25s}
 .bt-splash.short .bt-word{display:none}
 
 
 .bt-zoom img{width:100%!important;height:100%!important;object-fit:cover}
 @media(prefers-reduced-motion:reduce){
-  .bt-stage-splash{animation:none!important;background:#fefefe}
-  .bt-disc,.bt-word,.bt-word span{animation:none!important;opacity:1;transform:none}
-  .bt-word{max-width:200px}
+  .bt-zoom{animation-duration:var(--boot-opening-duration,1.2s)!important}
+  .bt-stage-splash{animation-duration:var(--boot-splash-duration,6s),var(--boot-fade-duration,.7s)!important}
+  .bt-disc{animation-duration:1.8s!important}
+  .bt-splash.short .bt-disc{animation-duration:1.3s!important}
+  .bt-word,.bt-word span{animation-duration:1.6s!important}
 }

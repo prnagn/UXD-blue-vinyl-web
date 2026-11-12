@@ -534,33 +534,25 @@ button.shipping-location{min-height:30px;border:0;background:none;text-decoratio
 .inbox-dialog::backdrop{background:#1013249c;backdrop-filter:blur(6px)}
 .delivery-close{position:absolute;right:1px;top:0}
 .delivery-stage{position:relative;display:grid;place-items:center;padding:17px 0 7px;perspective:1100px}
-.delivery-letter{position:relative;width:94%;max-width:318px;aspect-ratio:.8;transform-style:preserve-3d;perspective:1100px}
-.letter-envelope{position:absolute;inset:0;z-index:6;transform:translateZ(3px);transform-style:preserve-3d;pointer-events:none}
-.letter-envelope-flap{position:absolute;left:5%;right:5%;bottom:60%;aspect-ratio:2;background:linear-gradient(90deg,#cfcdc3 49.8%,#e2dfd4 50%,#ccc9be 50.2%);clip-path:polygon(50% 0,100% 100%,0 100%);transform-origin:50% 100%;backface-visibility:hidden;animation:envelope-flap var(--letter-duration,2s) cubic-bezier(.4,0,.2,1) both}
-.letter-envelope-half{position:absolute;top:40%;height:36%;width:45%;background:#eeeade;box-shadow:inset 0 0 0 .5px #d9d5c8;backface-visibility:hidden;animation:envelope-side var(--letter-duration,2s) cubic-bezier(.4,0,.2,1) both}
-.letter-envelope-half.envelope-left{left:5%;border-radius:0 0 0 14px;transform-origin:0 50%;--envelope-angle:-100deg}
-.letter-envelope-half.envelope-right{right:5%;border-radius:0 0 14px 0;transform-origin:100% 50%;--envelope-angle:100deg}
-@keyframes envelope-flap{0%,6%{transform:rotateX(-180deg)}28%,52%{transform:rotateX(0)}85%,100%{transform:rotateX(-90deg)}}
-@keyframes envelope-side{0%,52%{transform:rotateY(0)}85%,100%{transform:rotateY(var(--envelope-angle))}}
-@keyframes letter-paper-arrival{0%,51%{visibility:hidden}52%,100%{visibility:visible}}
-.letter-left-half,.letter-right-fold{position:absolute;top:0;bottom:0;width:50%;transform-style:preserve-3d}
-.letter-left-half{left:0;animation:letter-paper-arrival var(--letter-duration,2s) linear both}
-.letter-right-fold{left:50%;transform-origin:0 50%;animation:letter-open-side var(--letter-duration,2s) cubic-bezier(.35,0,.2,1) both}
-.letter-paper{position:absolute;left:0;width:100%;height:50%;display:block;background:radial-gradient(#8b744b30 .55px,transparent .9px) 0 0/3px 3px,linear-gradient(29deg,transparent 49.6%,#9e885525 50%,transparent 50.5%),linear-gradient(145deg,#e5d7a6,#d6c494);box-shadow:inset 0 0 0 1px #a28b5930,0 5px 14px #0a0e1b33;backface-visibility:visible}
-.letter-top-quarter{top:0}
-.letter-bottom-fold{top:50%;transform-origin:50% 0;animation:letter-open-bottom var(--letter-duration,2s) cubic-bezier(.35,0,.2,1) both}
-.letter-crease{position:absolute;z-index:3;inset:0;transform:translateZ(1.5px);pointer-events:none;background:linear-gradient(90deg,transparent 49.2%,#806d3930 50%,#fff5 50.3%,transparent 51%),linear-gradient(0deg,transparent 49.6%,#91794b2e 50%,#fff3 50.4%,transparent 51%);animation:letter-unmask var(--letter-duration,2s) linear both}
-.letter-contents{position:absolute;z-index:4;inset:0;transform:translateZ(2px);animation:letter-unmask var(--letter-duration,2s) linear both}
-.letter-contents .cover{position:absolute;z-index:2;width:58%;aspect-ratio:1;left:11%;top:27%;font-size:36px;border-radius:1px;transform:rotate(-1deg);box-shadow:0 5px 14px #443a2559}
-.letter-contents .vinyl{position:absolute;z-index:1;width:55%;left:35%;top:28.5%;box-shadow:0 5px 14px #443a2559}
-.letter-airmail-mark{position:absolute;left:5%;top:5%;padding:3px 6px;border:1px solid #a7835a;font:700 8px var(--serif);letter-spacing:.2em;color:#a7835a}
-.letter-postmark{position:absolute;right:7%;top:4%;width:20%;aspect-ratio:1;border:1px solid #a7835a88;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;transform:rotate(-12deg);font:italic 10px var(--serif);color:#9b7953;overflow:hidden}
+.delivery-letter{--letter-paper:#eeeade;position:relative;width:94%;max-width:318px;aspect-ratio:1;transform-style:preserve-3d;perspective:1100px}
+.letter-paper-base{position:absolute;inset:50% 0 0;background:var(--letter-paper);border-radius:0 0 14px 14px;box-shadow:0 7px 20px #0a0e1b33}
+.letter-roof{position:absolute;inset:0 0 50%;background:var(--letter-paper);clip-path:polygon(50% 0,100% 100%,0 100%)}
+.letter-corner{position:absolute;z-index:5;top:0;width:50%;height:50%;background:var(--letter-paper);transform-origin:50% 50%;backface-visibility:visible;animation:letter-corners-open var(--letter-duration,2s) cubic-bezier(.4,0,.2,1) both}
+.letter-corner::after{content:"";position:absolute;inset:0;background:#cfcdc3;animation:letter-corner-light var(--letter-duration,2s) ease both;pointer-events:none}
+.letter-corner-left{left:0;clip-path:polygon(0 0,100% 0,0 100%);--corner-axis-x:1;--corner-axis-y:-1}
+.letter-corner-right{right:0;clip-path:polygon(0 0,100% 0,100% 100%);--corner-axis-x:1;--corner-axis-y:1}
+.letter-crease{position:absolute;z-index:2;inset:0;transform:translateZ(.5px);pointer-events:none;background:linear-gradient(90deg,transparent 49.8%,#cbc7bc66 50%,transparent 50.2%),linear-gradient(0deg,transparent 49.8%,#cbc7bc55 50%,transparent 50.2%)}
+.letter-contents{position:absolute;z-index:4;inset:0;transform:translateZ(1px);animation:letter-unmask var(--letter-duration,2s) cubic-bezier(.4,0,.2,1) both}
+.letter-contents .cover{position:absolute;z-index:2;width:58%;aspect-ratio:1;left:11%;top:27%;font-size:36px;border-radius:1px;transform:rotate(-1deg);box-shadow:0 5px 14px #34342c40}
+.letter-contents .vinyl{position:absolute;z-index:1;width:55%;left:35%;top:28.5%;box-shadow:0 5px 14px #34342c40}
+.letter-airmail-mark{position:absolute;left:5%;top:5%;padding:3px 6px;border:1px solid #99968c;font:700 8px var(--serif);letter-spacing:.2em;color:#8d897e}
+.letter-postmark{position:absolute;right:7%;top:4%;width:20%;aspect-ratio:1;border:1px solid #99968c88;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;transform:rotate(-12deg);font:italic 10px var(--serif);color:#8d897e;overflow:hidden}
 .letter-postmark small{font:6px system-ui;color:inherit}
 .delivery-details{animation:letter-actions var(--letter-duration,2s) ease-out both}
-@keyframes letter-open-side{0%,51%{visibility:hidden;transform:translateZ(.8px) rotateY(-180deg)}52%{visibility:visible;transform:translateZ(.8px) rotateY(-180deg)}90%,100%{visibility:visible;transform:translateZ(.8px) rotateY(0)}}
-@keyframes letter-open-bottom{0%,72%{transform:translateZ(.4px) rotateX(180deg)}98%,100%{transform:translateZ(.4px) rotateX(0)}}
-@keyframes letter-unmask{0%,70%{clip-path:inset(0 100% 100% 0)}90%{clip-path:inset(0 0 50% 0)}98%,100%{clip-path:inset(0)}}
-@keyframes letter-actions{0%,97%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes letter-corners-open{0%,18%{transform:rotate3d(var(--corner-axis-x),var(--corner-axis-y),0,180deg)}92%,100%{transform:rotate3d(var(--corner-axis-x),var(--corner-axis-y),0,0deg)}}
+@keyframes letter-corner-light{0%,18%{opacity:1}85%,100%{opacity:0}}
+@keyframes letter-unmask{0%,30%{clip-path:inset(0 50% 0 50%)}92%,100%{clip-path:inset(0)}}
+@keyframes letter-actions{0%,92%{opacity:0;transform:translateY(6px)}100%{opacity:1;transform:translateY(0)}}
 .delivery-caption{text-align:center;padding:6px 0 11px}
 .delivery-caption h2{margin:0 0 3px;font:22px var(--serif);overflow-wrap:anywhere}
 .delivery-nav{font-size:10px;letter-spacing:.13em;color:var(--muted)}
@@ -680,7 +672,7 @@ button.shipping-location{min-height:30px;border:0;background:none;text-decoratio
 @media(max-width:599px){.app{--app-width:100vw}}
 @media(max-width:345px){.content{padding-inline:17px}.field-pair{gap:7px}.record-grid{gap:5px}.shelf{padding-inline:8%}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
-@media(prefers-reduced-motion:reduce){.letter-right-fold,.letter-bottom-fold,.letter-contents,.letter-crease,.delivery-details{animation-duration:var(--letter-duration,2s)!important}}
+@media(prefers-reduced-motion:reduce){.letter-corner,.letter-corner::after,.letter-contents,.delivery-details{animation-duration:var(--letter-duration,2s)!important}}
 @media(prefers-reduced-motion:reduce){.airmail-flight{animation-duration:14.222s!important}}
 @media(prefers-reduced-motion:reduce){.parcel-arrived:not(.parcel-opening) .parcel-sleeve,.parcel-arrived:not(.parcel-opening) .parcel-box{animation-name:parcel-arrived-glow;animation-duration:4.2s!important}.parcel-opening .parcel-paper{animation-name:parcel-paper-fade;animation-duration:1.2s!important}.parcel-opening .parcel-inner{animation-name:new-details-in;animation-duration:1.2s!important}}
 @media(prefers-reduced-motion:reduce){.draft-photo-pin.new-photo-pin{animation-name:draft-pin-rise-soft;animation-duration:.65s!important}}
@@ -690,10 +682,8 @@ button.shipping-location{min-height:30px;border:0;background:none;text-decoratio
 @media(prefers-reduced-motion:reduce){.vinyl.rotating{animation-duration:180s!important}.latest-disc .vinyl.rotating{animation-duration:60s!important}}
 
 /* Returning from the preview keeps the same unfolded sheet in place. */
-.letter-opened .letter-right-fold{animation:none!important;transform:translateZ(.8px) rotateY(0)}
-.letter-opened .letter-envelope{display:none}
-.letter-opened .letter-left-half{animation:none!important;visibility:visible}
-.letter-opened .letter-bottom-fold{animation:none!important;transform:translateZ(.4px) rotateX(0)}
+.letter-opened .letter-corner{animation:none!important;transform:none}
+.letter-opened .letter-corner::after{animation:none!important;opacity:0}
 .letter-opened .letter-contents,.letter-opened .letter-crease{animation:none!important;clip-path:inset(0)}
 .letter-opened .delivery-details{animation:none!important;opacity:1;transform:none}
 .guided-play{position:relative;background:#fff9e9;color:#1c2336;box-shadow:0 0 0 3px #fff4cf66,0 0 16px #ffe7a94d}
@@ -702,7 +692,6 @@ button.shipping-location{min-height:30px;border:0;background:none;text-decoratio
 @media(max-height:600px) and (min-aspect-ratio:1/1){.app{--app-width:min(100vw,calc(100dvh * 393 / 852));height:100dvh}}
 @media(max-height:680px){.delivery-letter{max-width:min(318px,calc((100dvh - 240px)*.8))}.delivery-stage{padding-top:8px}.delivery-caption h2{font-size:19px}}
 @media(prefers-reduced-motion:reduce){.guided-play::after{animation:none!important}}
-@media(prefers-reduced-motion:reduce){.letter-envelope-flap,.letter-envelope-half,.letter-left-half{animation-duration:var(--letter-duration,2s)!important}}
 @media(prefers-reduced-motion:reduce){
   .focus-record,.focus-arm-mount{transition-duration:.65s!important}
   .focus-arm{transition-duration:.35s!important}
