@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
 import { JourneyWheel } from './journey-wheel';
 import { Icon, Top, Vinyl } from './ui';
+import { DraftPhotoPins, grooveRadius } from './draft-photo-pins';
 
-export function BlankRecord({ back, enter, finish, home, record, grooveCount = 0, engraving = false }) {
+export function BlankRecord({ album, back, enter, finish, home, record, grooveCount = 0, engraving = false, entering = false, entered }) {
   const [wheel, setWheel] = useState(false);
   const visibleGrooves = Math.min(grooveCount, 80);
-  return <div className="blank-record">
+  return <div className={'blank-record' + (entering ? ' record-entering' : '')}>
     <Top title="" back={back} action={home || (() => setWheel((open) => !open))} actionLabel={home ? '선반으로 돌아가기' : 'LP 휠 메뉴'} />
-    <div className="blank-stage">
+    <div className="blank-stage" onAnimationEnd={(event) => {
+      if (event.target === event.currentTarget && event.animationName === 'draft-record-enter') entered?.();
+    }}>
       <Vinyl color="#36363a" />
       {grooveCount > 0 && <svg className="engraved-grooves" viewBox="0 0 100 100" aria-hidden="true">
         {Array.from({ length: visibleGrooves }, (_, index) => {
-          const radius = 22 + 26 * (index + 1) / (visibleGrooves + 1);
+          const radius = grooveRadius(index);
           const isNew = engraving && index === visibleGrooves - 1;
           return <g key={index} className={isNew ? 'new-groove' : undefined}>
             <circle className="groove-shadow" cx="50" cy="50" r={radius - .22} />
@@ -20,6 +23,7 @@ export function BlankRecord({ back, enter, finish, home, record, grooveCount = 0
         })}
       </svg>}
       {record && <button className="draft-record-trigger" aria-label="LP판 · 다음 순간 기록" onClick={record} />}
+      {album && <DraftPhotoPins album={album} engraving={engraving} />}
       <button className="blank-center" aria-label="LP 가운데 · 휠 메뉴" aria-expanded={wheel} aria-controls="blank-wheel" onClick={() => setWheel((open) => !open)} />
       {record && wheel && <JourneyWheel enter={enter} finish={finish} />}
       {!record && wheel && <div className="blank-wheel" id="blank-wheel">
@@ -34,15 +38,15 @@ export function BlankRecord({ back, enter, finish, home, record, grooveCount = 0
   </div>;
 }
 
-export function TripDetails({ form, update, save, busy, back }) {
+export function TripDetails({ form, update, save, busy, back, embedded = false }) {
   const [addingLocation, setAddingLocation] = useState(false);
   const location = [form.city, form.country].filter(Boolean).join(', ');
   return <div className="trip-details">
-    <header className="details-header">
+    {!embedded && <header className="details-header">
       <button className="icon-button" onClick={back} aria-label="뒤로"><Icon name="back" /></button>
       <button className="details-save" form="trip-details-form" type="submit" disabled={busy}>Save</button>
-    </header>
-    <div className="details-disc"><Vinyl color="#36363a" /></div>
+    </header>}
+    {!embedded && <div className="details-disc"><Vinyl color="#36363a" /></div>}
     <form id="trip-details-form" className="details-form" onSubmit={save}>
       <label className="lp-name">
         <span>LP Name <small>{form.name.length}/50</small></span>

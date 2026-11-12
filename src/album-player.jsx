@@ -1,19 +1,25 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { MomentMap } from './moment-map';
-import { albumPlaybackTracks, trackArt } from './archive';
+import { albumArt, albumPlaybackTracks, trackArt } from './archive';
 import { SpotifyPlayer } from './spotify-player';
+import { SpotifyPlaybackContext } from './spotify-context';
 import { ReplayArm } from './replay-arm';
 import { trackRadius } from './replay-geometry';
 import { ScatteredPhotos } from './album-photos';
+import { playbackDays } from './playback-days';
+import { DayTimeline } from './day-timeline';
 import { albumTitle, Icon, Top, useMedia, Vinyl } from './ui';
 
 export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, selectedId, onTrack, back, send, autoStart, save, busy }) {
+  const spotifyService = useContext(SpotifyPlaybackContext);
   const tracks = albumPlaybackTracks(allTracks);
   const track = tracks.find((entry) => entry.id === (selectedId || selectedTrack?.id)) || tracks[0];
   const [playing, setPlaying] = useState(false);
   const [reveal, setReveal] = useState(track?.kind === 'spotify');
   const [error, setError] = useState('');
   const [zoom, setZoom] = useState('record');
+  const [showList, setShowList] = useState(false);
+  const [position, setPosition] = useState({ id: '', fraction: 0 });
   const player = useRef(null);
   const spotifyController = useRef(null);
   const spotifyIntent = useRef('');
@@ -25,10 +31,13 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
   const zoomTimer = useRef(null);
   const index = tracks.indexOf(track);
   const source = useMedia(track);
-  const currentPhoto = trackArt(album, track);
+  const currentPhoto = trackArt(album, track) || (!track ? albumArt(album) : undefined);
   const art = useMedia(currentPhoto);
   const isMedia = track?.kind === 'audio' || track?.kind === 'video';
   const isSpotify = track?.kind === 'spotify';
+  const days = playbackDays(tracks, album.start);
+  const day = days.find((entry) => entry.indices.includes(index));
+  const progress = position.id === track?.id ? position.fraction : 0;
   useEffect(() => () => clearTimeout(zoomTimer.current), []);
 
   useEffect(() => {
@@ -60,6 +69,7 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
 
   function select(entry, autoplay = false) {
     if (!entry) return;
+    if (autoplay && entry.kind === 'spotify') spotifyService?.activatePlayback?.();
     stop();
     wantsPlayback.current = autoplay && entry.kind !== 'spotify';
     spotifyIntent.current = autoplay && entry.kind === 'spotify' ? entry.id : '';
@@ -73,6 +83,7 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
 
   async function play() {
     if (isSpotify) {
+      spotifyService?.activatePlayback?.();
       setReveal(true);
       if (spotifyController.current) spotifyController.current.togglePlay();
       else spotifyIntent.current = track.id;
@@ -112,7 +123,11 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
     src: source,
     onPlay: (event) => { if (wantsPlayback.current) setPlaying(true); else event.currentTarget.pause(); },
     onPause: () => setPlaying(false),
-    onEnded: stop,
+    onTimeUpdate: (event) => {
+      const media = event.currentTarget;
+      setPosition({ id: track.id, fraction: media.duration > 0 ? media.currentTime / media.duration : 0 });
+    },
+    onEnded: () => { stop(); setPosition({ id: track.id, fraction: 1 }); },
     onError: () => { stop(); setError('이 트랙을 열 수 없어요.'); },
   };
   const showVideo = track?.kind === 'video' && (reveal || playing);
@@ -155,18 +170,33 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
       </div>
     </div>
     <div className="focus-bottom">
-      <h1>{albumTitle(album)}</h1>
-      {track && <div className="focus-track">
-        <button className="icon-button" aria-label="이전 트랙" disabled={index <= 0} onClick={() => move(-1)}><Icon name="back" size={16} /></button>
-        <button className="focus-track-name" onClick={play} aria-label={isSpotify ? track.name + (playing ? ' · 일시정지' : ' · Spotify 재생') : undefined}><Icon name={playing ? 'pause' : isMedia || isSpotify ? 'play' : 'list'} size={15} /><span>{track.name}</span></button>
-        <button className="icon-button" aria-label="다음 트랙" disabled={index >= tracks.length - 1} onClick={() => move(1)}><Icon name="next" size={16} /></button>
-      </div>}
-      {track && <div className="focus-progress" aria-label={String(index + 1) + ' / ' + tracks.length + ' 트랙'}>
-        {tracks.length <= 12 ? tracks.map((entry, i) => <button type="button" key={entry.id} className={i === index ? 'active' : ''} aria-label={(i + 1) + '번 트랙'} aria-current={i === index ? 'true' : undefined}
-          onClick={() => select(entry, playing)} />) : <span>{index + 1} / {tracks.length}</span>}
-      </div>}
+      <div className="focus-day-meta">
+        <h1>{[album.city, album.country].filter(Boolean).join(', ') || albumTitle(album)}</h1>
+        {day?.date && <span>{day.date.replaceAll('-', '.')}</span>}
+        {day && <span>Day {day.number}</span>}
+      </div>
+      {track && <>
+        <DayTimeline days={days} tracks={tracks} index={index} progress={progress} select={(entry) => select(entry, playing)} />
+        <div className="day-player-controls">
+          <button className="icon-button" aria-label="이전 트랙" disabled={index <= 0} onClick={() => move(-1)}><Icon name="skip-back" size={24} /></button>
+          <button className="icon-button day-play" onClick={play} aria-label={playing ? '일시정지' : '재생'} aria-pressed={playing}><Icon name={playing ? 'pause' : 'play'} size={30} /></button>
+          <button className="icon-button" aria-label="다음 트랙" disabled={index >= tracks.length - 1} onClick={() => move(1)}><Icon name="skip-next" size={24} /></button>
+          <button className="icon-button" aria-label="날짜별 트랙 목록" aria-expanded={showList} aria-controls="day-track-list" onClick={() => setShowList((value) => !value)}><Icon name="list" size={24} /></button>
+        </div>
+        <p className="day-song-name">{track.name}</p>
+        {showList && <section id="day-track-list" className="day-track-list" aria-label="날짜별 트랙 목록">
+          {days.map((entry, i) => <div key={i}>
+            <button className="day-track-heading" onClick={() => select(tracks[entry.indices[0]], playing)}>Day {entry.number}<span>{entry.date.replaceAll('-', '.')}</span></button>
+            {entry.indices.map((at) => <button key={tracks[at].id} className="day-track-item" aria-current={at === index ? 'true' : undefined} onClick={() => select(tracks[at], playing)}>
+              <Icon name={tracks[at].kind === 'spotify' ? 'audio' : 'mic'} size={15} /><span>{tracks[at].name}</span>
+              {at === index && <Icon name={playing ? 'pause' : 'play'} size={14} />}
+            </button>)}
+          </div>)}
+        </section>}
+      </>}
       {isSpotify && reveal && <div className="focus-spotify" aria-label="기록한 Spotify 곡">
         <SpotifyPlayer key={track.id} song={track.spotify} controllerRef={spotifyController}
+          onProgress={(fraction) => { if (activeTrack.current === track.id) setPosition({ id: track.id, fraction }); }}
           onPlaying={(value) => { if (activeTrack.current === track.id) setPlaying(value); }}
           onReady={(controller) => {
             if (activeTrack.current === track.id && spotifyIntent.current === track.id) {

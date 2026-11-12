@@ -1,22 +1,29 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { addDelivery, albumArt, albumFile, deliverySchedule, demos, importAlbum, loadAlbums, loadInbox, localDay, localTime, resetArchive, resolveDelivery, saveAlbum, trackArt } from './archive';
+import { addDelivery, albumArt, albumFile, deliverySchedule, ensureWelcomeDelivery, importAlbum, loadAlbums, loadInbox, localDay, localTime, resetArchive, resolveDelivery, saveAlbum, trackArt, visibleShelfAlbums } from './archive';
 import { AlbumPlayer } from './album-player';
 import { ArtPicker } from './art-picker';
 import { BlankRecord, TripDetails } from './trip-details';
+import { NewAlbum } from './new-album';
 import { HomeTurntable } from './home-turntable';
+import { ParcelShelf } from './parcel-shelf';
+import { availableOnTurntable, parcelState } from './parcel-state';
 import { JourneyConfirm, PressCompleted, PressRecord } from './press-record';
-import { ReturnMail, ShippingScreen } from './shipping';
+import { LazyScreen } from './lazy-screen';
 import { TripMoment } from './trip-moment';
 import { LiveCapture } from './live-capture';
 import { useSpotify } from './spotify';
 import { SpotifyPlaybackContext } from './spotify-context';
 import { reorderMoments } from './moment-groups';
 import { Inbox } from './inbox';
-import { Arm, Icon, Plane, PullSleeve, SleeveFace, Top, Vinyl, albumTitle, dateLabel, entryIcons, useMedia } from './ui';
+import { FlyingAirmail } from './flying-airmail';
+import { Arm, Icon, Plane, PullSleeve, SharedTag, SleeveFace, Top, Vinyl, albumTitle, dateLabel, entryIcons, useMedia } from './ui';
 import { Recorder, TrackMedia } from './recorder';
-import { TravelMap } from './map';
 import './style.css';
+
+const TravelMap = lazy(() => import('./map').then((module) => ({ default: module.TravelMap })));
+const ShippingScreen = lazy(() => import('./shipping').then((module) => ({ default: module.ShippingScreen })));
+const ReturnMail = lazy(() => import('./shipping').then((module) => ({ default: module.ReturnMail })));
 
 const newTrip = () => ({ name: '', city: '', country: '', start: localDay(), end: '' });
 const kindName = { photo: '사진', audio: '소리', video: '영상', memo: '메모' };
@@ -33,6 +40,7 @@ function App() {
   const [form, setForm] = useState(newTrip);
   const [editingDetails, setEditingDetails] = useState(false);
   const [engraving, setEngraving] = useState(false);
+  const [draftEntering, setDraftEntering] = useState(false);
   const [reviewFrom, setReviewFrom] = useState('trip');
   const [pressFrom, setPressFrom] = useState('review');
   const [preview, setPreview] = useState('');
@@ -68,6 +76,7 @@ function App() {
     const receiving = new Set();
     async function refreshInbox() {
       try {
+        await ensureWelcomeDelivery();
         const items = await loadInbox();
         if (active) setInbox(items);
       } catch {
@@ -125,9 +134,8 @@ function App() {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  const albums = [...records, ...demos.filter((demo) => !records.some((record) => record.id === demo.id))]
-    .sort((a, b) => b.start.localeCompare(a.start));
-  const shelfAlbums = albums.filter((item) => !item.delivery || item.delivery.arrivesOn <= today);
+  const albums = visibleShelfAlbums(records);
+  const shelfAlbums = albums;
   const album = previewDelivery?.album || albums.find((item) => item.id === id);
   const cover = useMedia(albumArt(album));
   const latestPhoto = album?.entries.findLast((entry) => entry.kind === 'photo');
@@ -145,6 +153,7 @@ function App() {
     setSheet('');
     setPlaying(false);
     setEngraving(false);
+    setDraftEntering(false);
     setPage(next);
   }, []);
   const showShipping = useCallback(() => go('shipping'), [go]);
@@ -157,12 +166,18 @@ function App() {
   }, [loaded, spotify.resumeAlbumId, records, go]);
 
   function openAlbum(item) {
+    if (!availableOnTurntable(item, today)) {
+      go('home'); setPreview(item.id);
+      return;
+    }
     setPreviewDelivery(null);
     setShareLink('');
     setId(item.id);
     setMomentNote('');
     setTrackId('');
-    go(item.phase === 'pressed' ? 'play' : item.grooves?.length ? 'draft-disc' : 'trip');
+    const next = item.phase === 'pressed' ? 'play' : (item.grooves?.length || !item.entries.length) ? 'draft-disc' : 'trip';
+    go(next);
+    setDraftEntering(next === 'draft-disc');
   }
 
   async function persist(value, next) {
@@ -184,7 +199,7 @@ function App() {
     }
   }
 
-  async function createTrip(event) {
+  async function createTrip(event, navigate = true) {
     event.preventDefault();
     if (!form.name.trim() || (form.end && form.end < form.start)) {
       setNotice('LP 이름과 일정을 확인해 주세요.');
@@ -198,10 +213,10 @@ function App() {
       return;
     }
     setMomentNote('');
-    await persist({
-      ...details, id: crypto.randomUUID(), entries: [], phase: 'trip',
+    return persist({
+      ...details, id: crypto.randomUUID(), entries: [], phase: 'trip', shelfAddedAt: Date.now(),
       color: colors[records.length % colors.length],
-    }, 'trip');
+    }, navigate ? 'draft-disc' : undefined);
   }
 
   async function addEntry(entry) {
@@ -295,6 +310,13 @@ function App() {
     if (await persist({ ...album, delivery })) goHome();
   }
 
+  async function unpackAlbum(item) {
+    if (parcelState(item, today).status !== 'arrived') return false;
+    const saved = await persist({ ...item, delivery: { ...item.delivery, unpackedAt: new Date().toISOString() } });
+    if (saved) setPreview(item.id);
+    return saved;
+  }
+
   function editDraftDetails() {
     setForm({ name: album.name || albumTitle(album), city: album.city, country: album.country, start: album.start, end: album.end });
     setEditingDetails(true);
@@ -381,14 +403,15 @@ function App() {
     saving.current = true;
     setBusy(true);
     try {
-      await resolveDelivery(delivery, keep);
+      const saved = await resolveDelivery(delivery, keep);
       if (keep) {
-        const item = delivery.album;
+        const item = saved;
         setRecords((items) => [item, ...items.filter((record) => record.id !== item.id)]);
+        setPreview('');
       }
       setInbox((items) => items.filter((item) => item.id !== delivery.id));
       setInboxIndex(0);
-      if (inbox.length === 1 && sheet === 'inbox') setSheet('');
+      if (sheet === 'inbox' && (keep || inbox.length === 1)) setSheet('');
       if (keep && previewDelivery) {
         setId(delivery.album.id);
         setPreviewDelivery(null);
@@ -420,7 +443,7 @@ function App() {
   }
 
   const goHome = () => { setPreview(''); setPreviewDelivery(null); go('home'); };
-  const latest = shelfAlbums.filter((item) => item.phase === 'pressed')
+  const latest = shelfAlbums.filter((item) => item.phase === 'pressed' && availableOnTurntable(item, today))
     .sort((a, b) => completionTime(b) - completionTime(a))[0];
   const returnFromPlayer = () => {
     if (previewDelivery) {
@@ -436,7 +459,9 @@ function App() {
     setBusy(true);
     try {
       await resetArchive(() => setNotice('다른 Blue Vinyl 창을 닫으면 초기화를 완료합니다.'));
-      setRecords([]); setInbox([]); setId(''); setMomentNote(''); setTrackId('');
+      await ensureWelcomeDelivery();
+      const freshInbox = await loadInbox();
+      setRecords([]); setInbox(freshInbox); setId(''); setMomentNote(''); setTrackId('');
       setPreview(''); setPreviewDelivery(null); setShareLink('');
       go('home');
       setNotice('기록을 초기화했어요.');
@@ -449,23 +474,24 @@ function App() {
     <div className={'app ' + (page === 'home' ? 'home-app' : '')}>
       <main className={'screen ' + page} ref={main}>
         {page === 'home' && <>
-          <HomeTurntable key={latest.id} album={latest} open={() => openAlbum(latest)}>
-            {inbox.length > 0 && <button className="plane-button" onClick={() => { setInboxIndex(0); setSheet('inbox'); }}
-              aria-label="종이비행기 · 받은 LP">
-              <Plane />
-            </button>}
+          <HomeTurntable key={latest?.id || 'empty'} album={latest} open={() => { if (latest) openAlbum(latest); }}>
+            <FlyingAirmail delivery={inbox[0]} paused={sheet === 'inbox'} open={() => { setInboxIndex(0); setSheet('inbox'); }} />
           </HomeTurntable>
           <section className="shelf" aria-label="LP 리스트">
             <button className="empty-sleeve" disabled={!loaded} onClick={() => { setForm(newTrip()); setEditingDetails(false); go('blank'); }}>
               <span className="spine">+ Add New Album</span><span className="empty-face"><Icon name="plus" size={25} /></span>
             </button>
             {shelfAlbums.map((item, index) => <div className="shelf-item" key={item.id}>
+              {!availableOnTurntable(item, today) ? <ParcelShelf album={item} today={today} expanded={preview === item.id}
+                toggle={() => setPreview(preview === item.id ? '' : item.id)} unpack={unpackAlbum} busy={busy} /> : <>
               <button className={'sleeve sleeve-' + index % 3} aria-expanded={preview === item.id}
                 onClick={() => setPreview(preview === item.id ? '' : item.id)}>
                 <span className="spine"><strong>{albumTitle(item)}</strong><span>{dateLabel(item.start)}</span>{item.phase === 'trip' && <i />}</span>
                 <SleeveFace album={item} />
+                {item.shared && <SharedTag />}
               </button>
               {preview === item.id && <PullSleeve album={item} open={() => openAlbum(item)} />}
+              </>}
             </div>)}
           </section>
           <div className="home-foot">
@@ -477,9 +503,11 @@ function App() {
           {spotify.error && <p className="home-spotify-error error" role="status">{spotify.error}</p>}
         </>}
 
-        {page === 'blank' && <BlankRecord back={goHome} home={goHome} enter={() => go('create')} />}
-        {page === 'draft-disc' && album && <BlankRecord enter={editDraftDetails} finish={finishAlbum}
-          home={goHome} record={() => go('trip')} grooveCount={album.grooves?.length || 0} engraving={engraving} />}
+        {page === 'blank' && <NewAlbum form={form} update={(patch) => setForm((value) => ({ ...value, ...patch }))}
+          save={createTrip} busy={busy} back={goHome} complete={() => go('draft-disc')} />}
+        {page === 'draft-disc' && album && <BlankRecord album={album} enter={editDraftDetails} finish={finishAlbum}
+          home={goHome} record={() => go('trip')} grooveCount={album.grooves?.length || 0} engraving={engraving}
+          entering={draftEntering} entered={() => setDraftEntering(false)} />}
         {page === 'create' && <TripDetails form={form} update={(patch) => setForm((value) => ({ ...value, ...patch }))}
           save={createTrip} busy={busy} back={() => go(editingDetails ? 'draft-disc' : 'blank')} />}
 
@@ -503,9 +531,9 @@ function App() {
           tracks={tracks} track={track} selectedId={trackId} onTrack={playTrack} back={returnFromPlayer} busy={busy} autoStart={Boolean(previewDelivery)}
           send={previewDelivery ? undefined : () => { setNotice(''); go('send-lp'); }}
           save={previewDelivery ? () => finishDelivery(previewDelivery, true) : undefined} />}
-        {page === 'send-lp' && album && <ReturnMail album={album} back={() => go('play')}
+        {page === 'send-lp' && album && <LazyScreen back={() => go('play')}><ReturnMail album={album} back={() => go('play')}
           createLink={['http:', 'https:'].includes(window.location.protocol) ? makeShareLink : undefined}
-          shareLink={shareLink} download={downloadAlbum} busy={busy} />}
+          shareLink={shareLink} download={downloadAlbum} busy={busy} /></LazyScreen>}
 
         {page === 'review' && album && <>
           <Top title="TODAY’S TRACK" back={returnFromPlayer} action={() => setSheet('edit')} actionIcon="edit" actionLabel="트랙 편집" />
@@ -536,8 +564,8 @@ function App() {
         {page === 'press' && album && <PressRecord photo={pressPhoto} busy={busy} back={() => go(pressFrom)}
           choose={() => chooseArt()} complete={pressAlbum} />}
         {page === 'complete' && album && <PressCompleted album={album} photo={cover} next={showShipping} />}
-        {page === 'shipping' && album?.delivery && <ShippingScreen album={album} busy={busy} save={saveDelivery} />}
-        {page === 'map' && <TravelMap albums={shelfAlbums.filter((item) => item.phase === 'pressed')} back={goHome} open={openAlbum} />}
+        {page === 'shipping' && album?.delivery && <LazyScreen back={goHome}><ShippingScreen album={album} busy={busy} save={saveDelivery} /></LazyScreen>}
+        {page === 'map' && <LazyScreen back={goHome}><TravelMap albums={shelfAlbums.filter((item) => item.phase === 'pressed')} back={goHome} open={openAlbum} /></LazyScreen>}
       </main>
 
       {sheet === 'inbox' && inbox.length > 0 && <Inbox items={inbox} index={inboxIndex} onIndex={setInboxIndex} close={() => setSheet('')}

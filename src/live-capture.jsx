@@ -96,7 +96,7 @@ function CaptureLines({ session, entries, holding, showGrooves }) {
 }
 
 export function LiveCapture({ album, entries, save, next, home, spotify, prepareRecording, busy }) {
-  const media = useCaptureSession(save, spotify, prepareRecording);
+  const media = useCaptureSession(save, spotify, prepareRecording, next);
   const pointer = useRef(null);
   const shot = useMedia(media.shot);
   const holding = media.phase === 'holding';

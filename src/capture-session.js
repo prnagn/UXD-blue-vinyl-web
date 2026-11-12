@@ -16,7 +16,7 @@ function snapshot(video) {
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.88));
 }
 
-export function useCaptureSession(save, spotify, prepareRecording) {
+export function useCaptureSession(save, spotify, prepareRecording, onCaptured) {
   const video = useRef(null);
   const camera = useRef(null);
   const cameraRequest = useRef(0);
@@ -25,6 +25,7 @@ export function useCaptureSession(save, spotify, prepareRecording) {
   const saveRef = useRef(save);
   const songRef = useRef(spotify);
   const prepareRef = useRef(prepareRecording);
+  const capturedRef = useRef(onCaptured);
   const timers = useRef(new Set());
   const [cameraState, setCameraState] = useState('off');
   const [phase, setPhase] = useState('idle');
@@ -38,10 +39,17 @@ export function useCaptureSession(save, spotify, prepareRecording) {
   saveRef.current = save;
   songRef.current = spotify;
   prepareRef.current = prepareRecording;
+  capturedRef.current = onCaptured;
 
   function later(action, ms) {
     const timer = setTimeout(() => { timers.current.delete(timer); if (alive.current) action(); }, ms);
     timers.current.add(timer);
+  }
+
+  function reviewCapture(capture, finished, requested) {
+    if (!requested || (!capture.photo && !capture.audio)) return;
+    // Keep the shutter feedback visible for 500 ms, and never leave before storage succeeds.
+    later(() => capturedRef.current?.(), Math.max(0, 500 - (performance.now() - finished)));
   }
 
   useEffect(() => {
@@ -207,8 +215,9 @@ export function useCaptureSession(save, spotify, prepareRecording) {
     try {
       if ((photo || audio) && await saveRef.current(captured) === false) throw new Error('save');
       active.saved = true;
+      reviewCapture(captured, active.finished, withPhoto);
     } catch {
-      pending.current = captured;
+      pending.current = { capture: captured, finished: active.finished, review: withPhoto };
       if (alive.current) { setUnsaved(true); setError('기록을 저장하지 못했어요. 다시 저장해 주세요.'); }
     }
     finally {
@@ -220,12 +229,14 @@ export function useCaptureSession(save, spotify, prepareRecording) {
 
   async function retrySave() {
     if (!pending.current || saving) return;
+    const retry = pending.current;
     setSaving(true);
     try {
-      if (await saveRef.current(pending.current) === false) return;
+      if (await saveRef.current(retry.capture) === false) return;
       pending.current = null;
       setUnsaved(false);
       setError('');
+      reviewCapture(retry.capture, retry.finished, retry.review);
     } catch { setError('기록을 저장하지 못했어요. 다시 저장해 주세요.'); }
     finally { if (alive.current) setSaving(false); }
   }

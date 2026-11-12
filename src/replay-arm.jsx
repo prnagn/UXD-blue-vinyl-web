@@ -80,14 +80,14 @@ export function ReplayArm({ playing, tracks, track, choose, toggle, stop, stage,
       if (tracks[next]) choose(tracks[next], true);
     }}>
     <svg viewBox="0 0 138 236" aria-hidden="true">
-      <defs><linearGradient id="focus-metal"><stop stopColor="#7d8089"/><stop offset=".55" stopColor="#e7e5de"/><stop offset="1" stopColor="#9d9d9a"/></linearGradient></defs>
-      <circle cx="107" cy="36" r="28" fill="#242831" opacity=".24" transform="translate(2 4)" />
-      <circle cx="107" cy="36" r="28" fill="#edece8" /><circle cx="107" cy="36" r="21" fill="#dfded9" />
-      <path d="M113 39L36 203" stroke="#222531" opacity=".33" strokeWidth="11" transform="translate(3 3)" />
-      <path d="M111 39L36 203" stroke="url(#focus-metal)" strokeWidth="9" strokeLinecap="round" />
-      <rect x="96" y="27" width="25" height="27" rx="5" fill="#d4d3cf" transform="rotate(26 108 40)" />
-      <rect x="18" y="194" width="35" height="14" rx="5" fill="#d8d7d2" transform="rotate(-29 35 201)" />
-      <path d="M31 208l2 7" stroke="#eeece6" strokeWidth="2" strokeLinecap="round" />
+      <g transform={'rotate(' + -angle + ' 107 36)'}>
+        <rect x="79" y="8" width="56" height="82" rx="28" fill="#d9d9d9" />
+        <circle cx="107" cy="36" r="28" fill="#ececec" stroke="#d9d9d9" strokeWidth="1" />
+        <rect x="91" y="28" width="33" height="23" rx="5" fill="#d9d9d9" transform="rotate(25 107 36)" />
+      </g>
+      <path d="M111 39 43 184" fill="none" stroke="#959595" strokeWidth="7" />
+      <path d="m43 181-7 17" fill="none" stroke="#d9d9d9" strokeWidth="10" />
+      <rect x="18" y="194" width="35" height="15" rx="5" fill="#d9d9d9" transform="rotate(-35 36 203)" />
     </svg>
   </button>;
 }
