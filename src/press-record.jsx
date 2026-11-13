@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { albumTitle, Icon, Top, Vinyl } from './ui';
-
-const holdMs = 2600;
+import { createPressHold } from './press-hold';
 
 export function JourneyConfirm({ confirm, close }) {
   const dialog = useRef(null);
@@ -16,62 +15,58 @@ export function JourneyConfirm({ confirm, close }) {
 }
 
 export function PressRecord({ photo, busy, back, choose, complete }) {
-  const [progress, setProgress] = useState(0);
-  const hold = useRef(null);
-  const frame = useRef(0);
-
-  useEffect(() => () => cancelAnimationFrame(frame.current), []);
-
-  function start(id) {
-    if (hold.current || busy || progress === 1) return;
-    hold.current = { id, at: performance.now() };
-    function tick(now) {
-      const active = hold.current;
-      if (!active) return;
-      const next = Math.min(1, (now - active.at) / holdMs);
-      setProgress(next);
-      if (next === 1) {
-        hold.current = null;
-        complete().then((saved) => { if (!saved) setProgress(0); });
-      } else frame.current = requestAnimationFrame(tick);
+  const [phase, setPhase] = useState('idle');
+  const room = useRef(null);
+  const visual = useRef(null);
+  const controller = useRef(null);
+  const completeRef = useRef(complete);
+  completeRef.current = complete;
+  useLayoutEffect(() => {
+    let height = visual.current.clientHeight;
+    let progress = 0;
+    function paint(value) {
+      progress = value;
+      room.current.style.setProperty('--press-inlay-offset', height * .47 * value + 'px');
+      room.current.style.setProperty('--press-dim', value * .83);
+      room.current.style.setProperty('--press-glow', value * 60 + 'px');
+      room.current.style.setProperty('--press-glow-spread', value * 12 + 'px');
     }
-    frame.current = requestAnimationFrame(tick);
-  }
+    const hold = createPressHold({ paint, phase: setPhase, complete: () => completeRef.current() });
+    controller.current = hold;
+    const resize = new ResizeObserver(() => { height = visual.current.clientHeight; paint(progress); });
+    resize.observe(visual.current);
+    paint(0);
+    const visibility = () => { if (document.hidden) hold.cancel(); };
+    document.addEventListener('visibilitychange', visibility);
+    return () => { hold.destroy(); controller.current = null; resize.disconnect(); document.removeEventListener('visibilitychange', visibility); };
+  }, []);
 
-  function cancel(id) {
-    if (hold.current?.id !== id) return;
-    hold.current = null;
-    cancelAnimationFrame(frame.current);
-    setProgress(0);
-  }
-
-  return <div className="press-room" style={{ '--press-progress': progress }}>
-    <Top title="" back={() => { if (!busy && progress < 1) back(); }} />
-    <button className="press-hold" aria-label="길게 눌러 LP 프레싱"
+  return <div className="press-room" ref={room}>
+    <Top title="" back={() => { if (!busy && phase !== 'saving') { controller.current?.cancel(); back(); } }} />
+    <button className="press-hold" aria-label="길게 눌러 LP 프레싱" aria-pressed={phase === 'pressing'} aria-busy={phase === 'saving'} disabled={busy || phase === 'saving'}
       onPointerDown={(event) => {
-        if (event.button !== 0 || hold.current) return;
+        if (event.button !== 0 || busy || !controller.current?.start(event.pointerId)) return;
         event.currentTarget.setPointerCapture(event.pointerId);
-        start(event.pointerId);
       }}
-      onPointerUp={(event) => cancel(event.pointerId)}
-      onPointerCancel={(event) => cancel(event.pointerId)}
-      onLostPointerCapture={(event) => cancel(event.pointerId)}
-      onBlur={() => cancel('keyboard')}
+      onPointerUp={(event) => controller.current?.cancel(event.pointerId)}
+      onPointerCancel={(event) => controller.current?.cancel(event.pointerId)}
+      onLostPointerCapture={(event) => controller.current?.cancel(event.pointerId)}
+      onBlur={() => controller.current?.cancel('keyboard')}
       onContextMenu={(event) => event.preventDefault()}
       onKeyDown={(event) => {
-        if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); start('keyboard'); }
+        if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); if (!event.repeat && !busy) controller.current?.start('keyboard'); }
       }}
       onKeyUp={(event) => {
-        if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); cancel('keyboard'); }
+        if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); controller.current?.cancel('keyboard'); }
       }}>
       <span className="press-heading">Press!</span>
-      <span className="press-visual" aria-hidden="true">
+      <span className="press-visual" ref={visual} aria-hidden="true">
         <span className="press-disc"><Vinyl color="#373738" /></span>
-        <span className="press-inlay">{photo && <img src={photo} alt="" />}</span>
+        <span className="press-inlay">{photo && <img src={photo} alt="" draggable={false} />}</span>
       </span>
-      <span className="press-instruction">{progress === 1 ? '프레싱 마무리 중…' : '완성될 때까지 길게 누르세요'}</span>
+      <span className="press-instruction">{phase === 'saving' ? '프레싱 마무리 중…' : '완성될 때까지 길게 누르세요'}</span>
     </button>
-    <button className="press-cover" onClick={choose} disabled={busy || progress > 0}><Icon name="camera" size={16} /> LP 커버 선택</button>
+    <button className="press-cover" onClick={choose} disabled={busy || phase !== 'idle'}><Icon name="camera" size={16} /> LP 커버 선택</button>
   </div>;
 }
 

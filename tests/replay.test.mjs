@@ -5,6 +5,7 @@ import { createServer } from 'vite';
 import { startAmbient } from '../src/ambient-audio.js';
 import { parkedAngle, needleRadius, trackRadius, trackAngle, replayArmAngle } from '../src/replay-geometry.js';
 import './capture.test.mjs';
+import './press-hold.test.mjs';
 import './spotify-browser.test.mjs';
 import { testSharedAirmail } from './shared-airmail.test.mjs';
 import { playbackDays, dayPosition, trackAtPosition } from '../src/playback-days.js';
@@ -13,6 +14,26 @@ import { availableOnTurntable, parcelState } from '../src/parcel-state.js';
 import { homeLayout } from '../src/home-layout.js';
 import { airmailFrames, guidedAirmailFrames } from '../src/airmail-flight.js';
 import { fitBootFrame, snapBootLp } from '../src/boot-layout.js';
+import { tonedPhotoAverage } from '../src/photo-tone.js';
+import { captureLensMorph, captureMotion } from '../src/capture-motion.js';
+
+for (const [width, height] of [[280, 600], [390, 844], [432, 932], [600, 800]]) {
+  const source = { x: -50, y: 300, size: 230 };
+  const morph = captureLensMorph(source, width, height);
+  const diameter = source.size * morph.scale;
+  assert(Math.abs(source.x + morph.x + diameter / 2 - width / 2) < .001, 'a partly clipped LP label must morph to the horizontal center of the camera');
+  assert(Math.abs(source.y + morph.y + diameter / 2 - height / 2) < .001, 'the camera lens must finish vertically centered');
+  assert(diameter <= 350 + .001 && diameter <= width * .82 + .001, 'the transition must match the responsive camera lens size');
+}
+assert(captureMotion.collapse < captureMotion.review, 'the black disc must finish collapsing before the automatic review navigation');
+
+assert.equal(tonedPhotoAverage(new Uint8ClampedArray([255, 255, 255, 0])), '#535d81', 'transparent photos need a valid fallback');
+const blueTone = tonedPhotoAverage(new Uint8ClampedArray([60, 140, 220, 255]));
+const blueRgb = blueTone.match(/\d+/g).map(Number);
+assert(blueRgb[2] > blueRgb[1] && blueRgb[1] > blueRgb[0], 'tone-down must retain the photo hue');
+assert(blueRgb.every(channel => channel >= 28 && channel <= 108), 'photo-derived backgrounds must remain dark enough for white controls');
+assert.equal(tonedPhotoAverage(new Uint8ClampedArray([60, 140, 220, 255, 255, 0, 0, 0])), blueTone, 'invisible image pixels must not tint the background');
+assert.equal(tonedPhotoAverage(new Uint8ClampedArray([255, 255, 255, 255])), 'rgb(80, 80, 80)', 'bright photos must be toned down instead of washing out white controls');
 
 for (const [width, height] of [[280, 600], [320, 568], [390, 844], [432, 932], [800, 360]]) {
   const scale = fitBootFrame(width, height);
@@ -181,9 +202,14 @@ try {
   assert.deepEqual(engravedPhotos({ ...album, grooves: [] }), [], 'an empty LP must not show photo pins');
   assert.deepEqual(engravedPhotos({ ...album, grooves: [{ entryIds: ['a2', 'memo'] }] }), [], 'audio-only or memo grooves must not invent a photo');
   const { BlankRecord } = await server.ssrLoadModule('/src/trip-details.jsx');
-  const emptyDraft = renderToStaticMarkup(React.createElement(BlankRecord, { album: { name: 'Journey', city: 'Daejeon', country: 'Korea', entries: [] }, record: () => {}, enter: () => {} }));
+  const emptyDraft = renderToStaticMarkup(React.createElement(BlankRecord, { album: { name: 'Journey', city: 'Daejeon', country: 'Korea', entries: [] }, record: () => {}, enter: () => {}, finish: () => {} }));
   assert(emptyDraft.includes('Daejeon, Korea') && emptyDraft.includes('0 MOMENTS') && emptyDraft.includes('+ Record a moment'), 'the empty LP must offer a visible recording button with location and count');
-  const countedDraft = renderToStaticMarkup(React.createElement(BlankRecord, { album, record: () => {} }));
+  assert(emptyDraft.match(/<button[^>]*class="draft-finish"[^>]*>/)[0].includes('disabled'), 'Finish must be disabled when there are no recorded moments');
+  const countedDraft = renderToStaticMarkup(React.createElement(BlankRecord, { album, record: () => {}, finish: () => {} }));
+  assert(!countedDraft.match(/<button[^>]*class="draft-finish"[^>]*>/)[0].includes('disabled'), 'Finish must become available when moments exist');
+  const { JourneyWheel } = await server.ssrLoadModule('/src/journey-wheel.jsx');
+  const emptyWheel = renderToStaticMarkup(React.createElement(JourneyWheel, { enter: () => {}, finish: () => {}, finishDisabled: true }));
+  assert(emptyWheel.match(/<button[^>]*aria-label="Finish my journey"[^>]*>/)[0].includes('disabled'), 'the center wheel must not bypass the empty-album Finish restriction');
   assert(countedDraft.includes('3 MOMENTS'), 'photos and audio recorded together count as one moment, not two separate files');
   const pinnedDisc = renderToStaticMarkup(React.createElement(BlankRecord, { album: pinnedAlbum, grooveCount: 1, engraving: true }));
   assert(pinnedDisc.includes('src="/one.jpg"') && pinnedDisc.includes('src="/two.jpg"'));

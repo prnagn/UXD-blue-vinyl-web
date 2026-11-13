@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useCaptureSession } from './capture-session';
 import { Icon, useMedia } from './ui';
+import { captureMotion } from './capture-motion';
 
 function CaptureLines({ session, entries, holding, showGrooves }) {
   const canvas = useRef(null);
@@ -40,6 +41,7 @@ function CaptureLines({ session, entries, holding, showGrooves }) {
       centerY = seam.y - radius;
       element.parentElement.style.setProperty('--capture-center-y', centerY + 'px');
       element.parentElement.style.setProperty('--capture-diameter', (radius + 28) * 2 + 'px');
+      element.parentElement.style.setProperty('--capture-origin-offset', (height / 2 - centerY) + 'px');
       schedule();
     }
     const resize = new ResizeObserver(measure);
@@ -134,7 +136,8 @@ export function LiveCapture({ album, entries, save, next, home, spotify, prepare
     media.finish(photo);
   }
 
-  return <section className={'live-capture phase-' + media.phase + ' camera-' + media.cameraState} aria-label="순간 녹화">
+  return <section className={'live-capture phase-' + media.phase + ' camera-' + media.cameraState} aria-label="순간 녹화"
+    style={{ '--capture-grow-duration': captureMotion.grow + 'ms', '--capture-collapse-duration': captureMotion.collapse + 'ms' }}>
     <div className="capture-disc" aria-hidden="true" />
     <CaptureLines session={media.session} entries={entries} holding={holding} showGrooves={media.phase !== 'idle' && media.phase !== 'preparing'} />
     <div className="live-navigation">

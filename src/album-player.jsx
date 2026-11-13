@@ -8,6 +8,7 @@ import { trackRadius } from './replay-geometry';
 import { ScatteredPhotos } from './album-photos';
 import { playbackDays } from './playback-days';
 import { DayTimeline } from './day-timeline';
+import { usePhotoTone } from './photo-tone';
 import { albumTitle, Icon, Top, useMedia, Vinyl } from './ui';
 
 export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, selectedId, onTrack, back, send, autoStart, save, busy }) {
@@ -15,6 +16,7 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
   const tracks = albumPlaybackTracks(allTracks);
   const track = tracks.find((entry) => entry.id === (selectedId || selectedTrack?.id)) || tracks[0];
   const [playing, setPlaying] = useState(false);
+  const [entering, setEntering] = useState(true);
   const [loadingId, setLoadingId] = useState(autoStart ? track?.id || '' : '');
   const [reveal, setReveal] = useState(track?.kind === 'spotify');
   const [error, setError] = useState('');
@@ -36,11 +38,16 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
   const source = useMedia(track);
   const currentPhoto = trackArt(album, track) || (!track ? albumArt(album) : undefined);
   const art = useMedia(currentPhoto);
+  const photoTone = usePhotoTone(currentPhoto, art);
   const isMedia = track?.kind === 'audio' || track?.kind === 'video';
   const isSpotify = track?.kind === 'spotify';
   const days = playbackDays(tracks, album.start);
   const day = days.find((entry) => entry.indices.includes(index));
   const progress = position.id === track?.id ? position.fraction : 0;
+  useEffect(() => {
+    const timer = setTimeout(() => setEntering(false), 1400);
+    return () => clearTimeout(timer);
+  }, []);
   useEffect(() => () => {
     playbackEpoch.current++;
     clearTimeout(zoomTimer.current);
@@ -176,10 +183,12 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
   const momentLayer = ['transition', 'moments', 'returning'].includes(zoom);
   const zoomingIn = zoom === 'transition' || zoom === 'moments';
 
-  return <div className="album-replay-scene"><div className={'album-focus' + (zoomingIn ? ' focus-zooming' : '') + (zoom === 'spread' ? ' focus-spread' : '')}
+  return <div className={'album-replay-scene' + (entering ? ' replay-entering' : '')} style={{ '--replay-bg': photoTone }} aria-busy={entering}
+    onAnimationEnd={event => { if (event.animationName === 'replay-arm-enter') setEntering(false); }}>
+    <div className={'album-focus' + (zoomingIn ? ' focus-zooming' : '') + (zoom === 'spread' ? ' focus-spread' : '')}
     inert={momentLayer} aria-hidden={momentLayer}>
     <Top title={autoStart ? 'RECEIVED RECORD' : 'BLUE VINYL'} back={back} action={send} actionIcon="plane" actionLabel="여행지로 LP 보내기" />
-    <div className="focus-stage zoom-gesture" ref={stage}
+    <div className="focus-stage zoom-gesture" ref={stage} inert={entering}
       onTouchStart={(event) => { startDistance.current = pinchDistance(event.touches); }}
       onTouchMove={(event) => {
         const distance = pinchDistance(event.touches);
@@ -212,7 +221,7 @@ export function AlbumPlayer({ album, tracks: allTracks, track: selectedTrack, se
         </button>
       </div>
     </div>
-    <div className="focus-bottom">
+    <div className="focus-bottom" inert={entering}>
       <div className="focus-day-meta">
         <h1>{[album.city, album.country].filter(Boolean).join(', ') || albumTitle(album)}</h1>
         {day?.date && <span>{day.date.replaceAll('-', '.')}</span>}

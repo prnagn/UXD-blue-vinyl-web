@@ -2,7 +2,7 @@ import React, { useId, useRef, useState } from 'react';
 
 const optionSpacing = 110;
 
-export function JourneyWheel({ enter, finish }) {
+export function JourneyWheel({ enter, finish, finishDisabled = false }) {
   const arcId = useId();
   const pointer = useRef(null);
   const dragged = useRef(false);
@@ -11,7 +11,7 @@ export function JourneyWheel({ enter, finish }) {
   const restingAngle = -active * optionSpacing;
   const options = [
     { label: 'Enter information', select: enter },
-    { label: 'Finish my journey', select: finish },
+    { label: 'Finish my journey', select: finish, disabled: finishDisabled },
   ];
 
   function angleAt(event) {
@@ -68,6 +68,7 @@ export function JourneyWheel({ enter, finish }) {
     <div className="journey-wheel-ring" style={{ '--wheel-angle': (restingAngle + offset) + 'deg' }}>
       {options.map((option, index) => <button key={option.label} id={arcId + '-' + index} type="button"
         className="wheel-item journey-wheel-action"
+        disabled={option.disabled || !option.select}
         style={{ '--option-angle': index * optionSpacing + 'deg' }}
         aria-label={option.label} aria-description="휠을 끌거나 방향키를 눌러 옵션을 바꿀 수 있어요."
         aria-current={active === index ? 'true' : undefined}

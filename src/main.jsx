@@ -14,7 +14,7 @@ import { TripMoment } from './trip-moment';
 import { LiveCapture } from './live-capture';
 import { useSpotify } from './spotify';
 import { SpotifyPlaybackContext } from './spotify-context';
-import { reorderMoments } from './moment-groups';
+import { pendingMoments, reorderMoments } from './moment-groups';
 import { Inbox } from './inbox';
 import { Arm, Icon, Plane, Top, Vinyl, albumTitle, entryIcons, useMedia } from './ui';
 import { Recorder, TrackMedia } from './recorder';
@@ -292,6 +292,7 @@ function App() {
   }
 
   function finishAlbum() {
+    if (!album || !pendingMoments({ ...album, grooves: [] }).length) return;
     setSheet('finish-journey');
   }
 

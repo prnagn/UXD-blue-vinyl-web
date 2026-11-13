@@ -15,11 +15,17 @@ export function ReplayArm({ playing, loading = false, tracks, track, choose, tog
     const area = stage.current.getBoundingClientRect();
     const disc = record.getBoundingClientRect();
     const matrix = element.querySelector('svg')?.getScreenCTM();
+    const translation = node => {
+      const [x = 0, y = 0] = (getComputedStyle(node).translate || 'none').split(' ').map(value => parseFloat(value) || 0);
+      return { x, y };
+    };
+    const recordEntry = translation(record);
+    const armEntry = translation(element.closest('.focus-arm-mount'));
     return {
-      x: matrix ? matrix.a * 107 + matrix.c * 36 + matrix.e : area.x + element.offsetLeft + element.offsetWidth * 107 / 138,
-      y: matrix ? matrix.b * 107 + matrix.d * 36 + matrix.f : area.y + element.offsetTop - element.offsetHeight * .57 + element.offsetHeight * 36 / 236,
+      x: matrix ? matrix.a * 107 + matrix.c * 36 + matrix.e - armEntry.x : area.x + element.offsetLeft + element.offsetWidth * 107 / 138,
+      y: matrix ? matrix.b * 107 + matrix.d * 36 + matrix.f - armEntry.y : area.y + element.offsetTop - element.offsetHeight * .57 + element.offsetHeight * 36 / 236,
       scale: matrix ? Math.hypot(matrix.a, matrix.b) : element.offsetWidth / 138,
-      cx: disc.x + disc.width / 2, cy: disc.y + disc.height / 2, radius: disc.width / 2,
+      cx: disc.x + disc.width / 2 - recordEntry.x, cy: disc.y + disc.height / 2 - recordEntry.y, radius: disc.width / 2,
     };
   }
 
@@ -34,8 +40,12 @@ export function ReplayArm({ playing, loading = false, tracks, track, choose, tog
     const settled = event => {
       if (event.propertyName === 'transform' && event.target.matches('.focus-record,.focus-arm-mount')) setLayout(measure());
     };
+    const entered = event => {
+      if (event.animationName === 'replay-record-enter' || event.animationName === 'replay-arm-enter') setLayout(measure());
+    };
     element?.addEventListener('transitionend', settled);
-    return () => { observer.disconnect(); element?.removeEventListener('transitionend', settled); };
+    element?.addEventListener('animationend', entered);
+    return () => { observer.disconnect(); element?.removeEventListener('transitionend', settled); element?.removeEventListener('animationend', entered); };
   }, [stage, view]);
 
   // The same physical needle position selects the ring and positions the arm.

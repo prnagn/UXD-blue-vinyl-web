@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { openCaptureMicrophone } from './capture-audio';
+import { captureMotion } from './capture-motion';
 
 function stopStream(stream) {
   stream?.getTracks().forEach((track) => track.stop());
@@ -49,7 +50,7 @@ export function useCaptureSession(save, spotify, prepareRecording, onCaptured) {
   function reviewCapture(capture, finished, requested) {
     if (!requested || (!capture.photo && !capture.audio)) return;
     // Keep the shutter feedback visible for 500 ms, and never leave before storage succeeds.
-    later(() => capturedRef.current?.(), Math.max(0, 500 - (performance.now() - finished)));
+    later(() => capturedRef.current?.(), Math.max(0, captureMotion.review - (performance.now() - finished)));
   }
 
   useEffect(() => {
@@ -196,7 +197,7 @@ export function useCaptureSession(save, spotify, prepareRecording, onCaptured) {
     const photoPromise = withPhoto && camera.current ? snapshot(video.current) : Promise.resolve(null);
     const photographing = withPhoto && Boolean(camera.current);
     setPhase(photographing ? 'exposing' : 'settling');
-    later(() => setPhase('idle'), photographing ? 850 : 260);
+    later(() => setPhase('idle'), photographing ? 850 : captureMotion.collapse);
     if (active.recorder?.state === 'recording') active.recorder.stop();
     const [photo, audio] = await Promise.all([photoPromise, active.audio]);
     if (!alive.current || active.cancelled) return;

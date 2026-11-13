@@ -1,6 +1,6 @@
 .screen.home{padding:0;overflow:hidden;background:#545e85;display:block}
-.home-scene{position:relative;height:100%;overflow:hidden;background:#545e85;isolation:isolate;touch-action:none}
-.home-scene::before{content:"";position:absolute;inset:0;background:linear-gradient(#545e85,#14161f);opacity:0;transition:opacity .9s;pointer-events:none}
+.home-scene{--home-bg-duration:1.8s;position:relative;height:100%;overflow:hidden;background:#545e85;isolation:isolate;touch-action:none}
+.home-scene::before{content:"";position:absolute;inset:0;background:linear-gradient(#545e85,#14161f);opacity:0;transition:opacity var(--home-bg-duration) cubic-bezier(.45,0,.55,1);pointer-events:none}
 .home-view-stack::before,.home-view-cover::before{opacity:1}
 .home-turntable-scene{position:absolute;inset:0;transition:transform 1.3s cubic-bezier(.4,0,.2,1) .12s,opacity .95s ease .12s}
 .home-view-stack .home-turntable-scene,.home-view-cover .home-turntable-scene{transform:translateY(-112%);opacity:0;transition:transform 1.2s cubic-bezier(.4,0,.2,1),opacity .95s}
@@ -66,6 +66,7 @@
 @media(prefers-reduced-motion:reduce){.airmail-flight.is-guided::before,.airmail-flight.is-guided img,.airmail-sparkles i{animation:none!important}}
 /* Keep the explicitly requested scene transitions legible instead of compressing them to .01 ms. */
 @media(prefers-reduced-motion:reduce){
+  .home-scene::before{transition-duration:var(--home-bg-duration)!important}
   .home-turntable-scene{transition-duration:1.3s,.95s!important}
   .home-view-stack .home-turntable-scene,.home-view-cover .home-turntable-scene{transition-duration:1.2s,.95s!important}
   .home-slab{transition-duration:1.2s,.7s!important}

@@ -1,16 +1,39 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { JourneyWheel } from './journey-wheel';
-import { albumTitle, Icon, Top, Vinyl } from './ui';
+import { albumTitle, Icon, Vinyl } from './ui';
 import { DraftPhotoPins, grooveRadius } from './draft-photo-pins';
 import { pendingMoments } from './moment-groups';
+import { captureLensMorph, captureMotion } from './capture-motion';
 
 export function BlankRecord({ album, back, enter, finish, home, record, grooveCount = 0, engraving = false, entering = false, entered }) {
   const [wheel, setWheel] = useState(false);
+  const [morph, setMorph] = useState(null);
+  const root = useRef(null);
+  const recordRef = useRef(record);
+  recordRef.current = record;
+  useEffect(() => {
+    if (!morph) return;
+    const timer = setTimeout(() => recordRef.current?.(), captureMotion.enter);
+    return () => clearTimeout(timer);
+  }, [morph]);
+  function startRecording() {
+    if (!record || morph) return;
+    const frame = root.current.getBoundingClientRect();
+    const label = root.current.querySelector('.blank-stage .vinyl-label').getBoundingClientRect();
+    const source = { x: label.left - frame.left, y: label.top - frame.top, size: label.width };
+    setWheel(false);
+    setMorph({ source, ...captureLensMorph(source, frame.width, frame.height) });
+  }
   const visibleGrooves = Math.min(grooveCount, 80);
   const moments = album ? pendingMoments({ ...album, grooves: [] }, album.entries || []).length : 0;
   const location = album && ([album.city, album.country].filter(Boolean).join(', ') || albumTitle(album));
-  return <div className={'blank-record' + (entering ? ' record-entering' : '')}>
-    <Top title="" back={back} action={home || (() => setWheel((open) => !open))} actionLabel={home ? '선반으로 돌아가기' : 'LP 휠 메뉴'} />
+  return <div ref={root} className={'blank-record' + (entering ? ' record-entering' : '') + (morph ? ' capture-leaving' : '')} inert={Boolean(morph)}
+    style={{ '--capture-enter-duration': captureMotion.enter + 'ms' }}>
+    <header className="top draft-top">
+      <button className="icon-button" aria-label="선반으로 돌아가기" onClick={home || back} disabled={!home && !back}><Icon name="back" /></button>
+      <span aria-hidden="true" />
+      <button className="draft-finish" onClick={finish} disabled={!finish || moments === 0}>Finish</button>
+    </header>
     <div className="blank-stage" onAnimationEnd={(event) => {
       if (event.target === event.currentTarget && event.animationName === 'draft-record-enter') entered?.();
     }}>
@@ -25,10 +48,10 @@ export function BlankRecord({ album, back, enter, finish, home, record, grooveCo
           </g>;
         })}
       </svg>}
-      {record && <button className="draft-record-trigger" aria-label="LP판 · 다음 순간 기록" onClick={record} />}
+      {record && <button className="draft-record-trigger" aria-label="LP판 · 다음 순간 기록" onClick={startRecording} />}
       {album && <DraftPhotoPins album={album} engraving={engraving} />}
       <button className="blank-center" aria-label="LP 가운데 · 휠 메뉴" aria-expanded={wheel} aria-controls="blank-wheel" onClick={() => setWheel((open) => !open)} />
-      {record && wheel && <JourneyWheel enter={enter} finish={finish} />}
+      {record && wheel && <JourneyWheel enter={enter} finish={finish} finishDisabled={moments === 0} />}
       {!record && wheel && <div className="blank-wheel" id="blank-wheel">
         <button className="wheel-item wheel-enter" aria-label="Enter information" onClick={enter}>
           <svg viewBox="0 0 180 180" aria-hidden="true"><path id="enter-arc" d="M108 19 A73 73 0 0 1 156 120" fill="none" /><text><textPath href="#enter-arc" startOffset="8%">Enter information</textPath></text></svg>
@@ -43,8 +66,12 @@ export function BlankRecord({ album, back, enter, finish, home, record, grooveCo
         <button className="draft-location" onClick={enter} aria-label="장소 정보 편집">{location}<Icon name="edit" size={13} /></button>
         <span aria-live="polite">{moments} {moments === 1 ? 'MOMENT' : 'MOMENTS'}</span>
       </div>
-      <footer className="draft-actions"><button className="primary" onClick={record}>+ Record a moment</button></footer>
+      <footer className="draft-actions"><button className="primary" onClick={startRecording}>+ Record a moment</button></footer>
     </>}
+    {morph && <div className="draft-capture-label" aria-hidden="true"
+      style={{ left: morph.source.x, top: morph.source.y, width: morph.source.size, height: morph.source.size, '--capture-lens-x': morph.x + 'px', '--capture-lens-y': morph.y + 'px', '--capture-lens-scale': morph.scale }}>
+      <span className="draft-capture-blue" /><span className="draft-capture-grey" /><span className="draft-capture-hole" />
+    </div>}
   </div>;
 }
 
